@@ -4,6 +4,7 @@ import {mkdtemp,mkdir,writeFile,access,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {readJSON} from '../core/storage.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const temporary=await mkdtemp(path.join(tmpdir(),'openvst-desktop-'));
 const pluginDir=path.join(temporary,'plugins');
@@ -29,7 +30,9 @@ try{
  assert.equal(await page.locator('html').getAttribute('data-theme'),'cyberpunk');
  await page.getByRole('button',{name:'Light',exact:true}).click();
  const initial=await page.evaluate(()=>window.manager.getState());
- assert.equal(initial.plugins.length,7);
+ const bundledCatalog=await readJSON(path.join(root,'catalog.json'));
+ const {data:catalog}=await readJSON(path.join(temporary,'cache','catalog.json'),{data:bundledCatalog});
+ assert.deepEqual(initial.plugins.map(plugin=>plugin.id).sort(),catalog.map(plugin=>plugin.id).sort());
  assert.equal(initial.settings.paths.VST3,pluginDir);
  await page.getByRole('textbox',{name:'Search plugins'}).fill('openMaster');
  await page.getByRole('button',{name:/openMaster Mastering/}).click();

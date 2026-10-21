@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {mkdtemp,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
+import {readJSON} from '../core/storage.mjs';
 const executablePath=process.platform==='win32'
   ? path.resolve('release/win-unpacked/OpenVST Manager.exe')
   : path.resolve(`release/mac${process.arch==='arm64'?'-arm64':''}/OpenVST Manager.app/Contents/MacOS/OpenVST Manager`);
@@ -14,7 +15,9 @@ try{
   const errors=[];page.on('pageerror',error=>errors.push(error.message));
   await page.getByRole('button',{name:'Settings',exact:true}).waitFor({timeout:90000});
   const state=await page.evaluate(()=>window.manager.getState());
-  assert.equal(state.plugins.length,7);
+  const bundledCatalog=await readJSON(path.resolve('catalog.json'));
+  const {data:catalog}=await readJSON(path.join(temporary,'cache','catalog.json'),{data:bundledCatalog});
+  assert.deepEqual(state.plugins.map(plugin=>plugin.id).sort(),catalog.map(plugin=>plugin.id).sort());
   assert.equal(await application.evaluate(({app})=>app.isPackaged),true);
   assert.equal(await application.evaluate(({app})=>app.getPath('userData')),temporary);
   await page.getByRole('button',{name:'Cyberpunk',exact:true}).click();
