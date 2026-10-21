@@ -1,4 +1,4 @@
-import { _electron as electron } from '@playwright/test';
+import { _electron as electron, expect } from '@playwright/test';
 import assert from 'node:assert/strict';
 import {mkdtemp,mkdir,writeFile,access,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
@@ -19,7 +19,10 @@ try{
  await page.screenshot({path:path.join(root,'docs','screenshots','library.png')});
  for(const theme of ['Dark','Cyberpunk']){
    await page.getByRole('button',{name:theme,exact:true}).click();
-   await page.screenshot({path:path.join(root,'docs','screenshots',theme.toLowerCase()+'.png')});
+   await expect(page.getByRole('button',{name:theme,exact:true})).toHaveAttribute('aria-pressed','true');
+   await expect(page.locator('html')).toHaveAttribute('data-theme',theme.toLowerCase());
+   await page.locator('.header-art').evaluate(image=>image.decode());
+   await page.screenshot({path:path.join(root,'docs','screenshots',theme.toLowerCase()+'.png'),animations:'disabled'});
  }
  await page.reload();
  await page.getByRole('button',{name:/openMaster Mastering/}).waitFor({timeout:90000});
