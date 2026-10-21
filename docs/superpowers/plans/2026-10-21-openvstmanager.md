@@ -19,11 +19,11 @@ Seven plugin repositories only. Public manager. macOS and Windows packaged in Ac
 
 ## Work
 
-- [ ] Release pipelines: inspect latest remote state in isolated clones, add tag publication, preserve validation and notices, push changes, publish version tags, verify jobs/assets.
-- [ ] Installer: implement tested bounded extraction, checksum verification, bundle allowlist, staged replacement and receipts, managed removal, detection, platform paths.
-- [ ] Interface: implement catalog rows, detail pane, search/filter, format/version choice, progress/error state, settings, keyboard access and generated artwork.
-- [ ] Integration: implement catalog/release client, IPC service, Electron security boundaries, packager, app workflows and README.
-- [ ] Verification: run tests/typecheck/build; actual app flow with disposable install folder; package launch; review security and failure handling; push and tag; inspect GitHub-built assets.
+- [x] Release pipelines: inspect latest remote state in isolated clones, add tag publication, preserve validation and notices, push changes, publish version tags, verify jobs/assets.
+- [x] Installer: implement tested bounded extraction, checksum verification, bundle allowlist, staged replacement and receipts, managed removal, detection, platform paths.
+- [x] Interface: implement catalog rows, detail pane, search/filter, format/version choice, progress/error state, settings, keyboard access and generated artwork.
+- [x] Integration: implement catalog/release client, IPC service, Electron security boundaries, packager, app workflows and README.
+- [x] Verification: run tests/typecheck/build; actual app flow with disposable install folder; package launch; review security and failure handling; push and tag; inspect GitHub-built assets.
 
 ## Shared interface
 
