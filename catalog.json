@@ -1,0 +1,80 @@
+[
+  {
+    "id": "openGlitchFX",
+    "repo": "openGlitchFX",
+    "name": "openGlitchFX",
+    "description": "A beat-synced playground for stutters, reversals and rhythmic disruption. Shape the unexpected across 32 steps.",
+    "category": "Creative",
+    "bundleNames": {
+      "VST3": "openGlitchFX.vst3"
+    }
+  },
+  {
+    "id": "openEDMFilter",
+    "repo": "openEDMFilter",
+    "name": "openEDMFilter",
+    "description": "Two expressive multimode filters with tempo-synced modulation, envelope followers and a little extra edge.",
+    "category": "Filter",
+    "bundleNames": {
+      "VST3": "openEDMFilter.vst3",
+      "AU": "openEDMFilter.component"
+    }
+  },
+  {
+    "id": "openSausage",
+    "repo": "openSausage",
+    "name": "openSausage",
+    "description": "Saturation, reverb, rising pitch and stereo width. Four simple controls for sound with character.",
+    "category": "Creative",
+    "bundleNames": {
+      "VST3": "openSausage.vst3",
+      "AU": "openSausage.component"
+    }
+  },
+  {
+    "id": "openTunerEQ",
+    "repo": "openTunerEQ",
+    "name": "openTunerEQ",
+    "description": "A five-band musical equalizer. Tune by note, snap to the chromatic scale and shape frequencies at the piano.",
+    "category": "Equalizer",
+    "bundleNames": {
+      "VST3": "openTunerEQ.vst3",
+      "AU": "openTunerEQ.component"
+    }
+  },
+  {
+    "id": "openMaster",
+    "repo": "openMaster",
+    "name": "openMaster",
+    "description": "Precise low and high cuts with focused control over the low-end stereo field. A considered final touch.",
+    "category": "Mastering",
+    "bundleNames": {
+      "VST3": [
+        "openMaster.vst3",
+        "Analog Master Strip.vst3"
+      ]
+    }
+  },
+  {
+    "id": "winamp-classic-equalizer-vst",
+    "repo": "winamp-classic-equalizer-vst",
+    "name": "Winamp Classic Equalizer",
+    "description": "The familiar ten-band equalizer, reimagined as a plugin with 4Front EQ10 and Constant-Q modes.",
+    "category": "Equalizer",
+    "bundleNames": {
+      "VST3": "Winamp Classic Equalizer.vst3"
+    },
+    "notice": "See the project README for provenance and usage terms."
+  },
+  {
+    "id": "winamp-classic-visualizer-vst",
+    "repo": "winamp-classic-visualizer-vst",
+    "name": "Winamp Classic Visualizer",
+    "description": "A classic spectrum analyzer and oscilloscope for your session. Familiar movement, in a modern plugin.",
+    "category": "Analyzer",
+    "bundleNames": {
+      "VST3": "Winamp Classic Visualizer.vst3"
+    },
+    "notice": "See the project README for provenance and usage terms."
+  }
+]

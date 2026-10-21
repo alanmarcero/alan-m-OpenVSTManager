@@ -1,0 +1,40 @@
+appId: com.alanmarcero.openvstmanager
+productName: OpenVST Manager
+copyright: Copyright © 2026 Alan Marcero
+artifactName: OpenVSTManager-${version}-${os}-${arch}.${ext}
+directories:
+  output: release
+files:
+  - dist/**
+  - electron/**
+  - core/**
+  - catalog.json
+  - assets/icon.png
+  - LICENSE
+  - THIRD_PARTY.md
+  - package.json
+asar: true
+mac:
+  category: public.app-category.music
+  icon: assets/icon.icns
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+  identity: '-'
+  hardenedRuntime: false
+  gatekeeperAssess: false
+  minimumSystemVersion: '12.0'
+win:
+  icon: assets/icon.ico
+  target:
+    - target: nsis
+      arch: [x64]
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+linux:
+  category: AudioVideo
+  icon: assets/icon.png
+  target: [AppImage, tar.gz]
