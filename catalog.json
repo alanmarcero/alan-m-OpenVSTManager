@@ -32,6 +32,17 @@
     }
   },
   {
+    "id": "openDucker",
+    "repo": "openDucker",
+    "name": "openDucker",
+    "description": "One knob for host-synced rhythmic ducking. Four recovery slopes, six beat rates, and DJ Duck on the decks.",
+    "category": "Dynamics",
+    "bundleNames": {
+      "VST3": "openDucker.vst3",
+      "AU": "openDucker.component"
+    }
+  },
+  {
     "id": "openTunerEQ",
     "repo": "openTunerEQ",
     "name": "openTunerEQ",
