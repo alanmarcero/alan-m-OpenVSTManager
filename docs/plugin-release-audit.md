@@ -1,6 +1,6 @@
 # Plugin release audit
 
-Verified 2026-10-21 13:48 UTC. All seven public releases are published. All 15 ZIP assets were downloaded without authentication and verified.
+Initial audit: 2026-10-21 13:48 UTC. The original seven public releases and 15 ZIP assets were downloaded without authentication and verified. openDucker was added later that day; its verification is recorded below, bringing the catalog to eight plugins and 17 ZIP assets.
 
 | Repository / release | Exact source | Validation run | Project license |
 | --- | --- | --- | --- |
@@ -49,3 +49,16 @@ Verified 2026-10-21 13:48 UTC. All seven public releases are published. All 15 Z
 - The Winamp repositories have no project LICENSE file. Their READMEs describe independent redevelopment without redistributed Winamp code. No project license was invented or changed. JUCE retains its upstream AGPL/commercial terms, and its notices are included.
 
 No build or download blockers remain. The Winamp source-license omission remains documented above.
+
+## openDucker addition — 2026-10-21
+
+[openDucker v1.0.0](https://github.com/alanmarcero/openDucker/releases/tag/v1.0.0) was built from [a0e9869](https://github.com/alanmarcero/openDucker/tree/a0e9869ddd6bb3a641f080057878bcc1e077cf93). [CI passed](https://github.com/alanmarcero/openDucker/actions/runs/39624213765): Linux address/undefined sanitizers, macOS universal and Windows x64 builds, native controls/state/audio tests, and pluginval level 5 on both platforms. Project license: AGPL-3.0.
+
+| Asset | Architecture | SHA-256 |
+| --- | --- | --- |
+| [openDucker-macOS-universal.zip](https://github.com/alanmarcero/openDucker/releases/download/v1.0.0/openDucker-macOS-universal.zip) | arm64 + x86_64, VST3 + AU | `10833ed12166efbaee2d34df67283034499ddcef260758fda248c3a95b617f0c` |
+| [openDucker-Windows-x64.zip](https://github.com/alanmarcero/openDucker/releases/download/v1.0.0/openDucker-Windows-x64.zip) | x86_64, VST3 | `16eeff48c70b9ad4ba097d0ac2687ff506262a91a718d026b31eff5c0181fc4c` |
+
+The real manager service downloaded these public assets without authentication, checked their GitHub SHA-256 digests, installed each format into isolated folders, detected managed v1.0.0 receipts, and removed the bundles cleanly. Extracted macOS bundles passed strict code-signature verification and contained both architecture slices. The Windows archive passed the same installer path with Windows platform selection on macOS, and its PE header was verified as x64; actual Windows execution was validated by CI. No user plugin folders were changed by this installation test.
+
+Catalog integration passed 63 core tests, TypeScript/production build, and nine browser UI tests. Existing manager releases refresh this public catalog; a new manager binary is not required.
