@@ -299,3 +299,66 @@ test('recovery refuses journal directories containing unrelated files', async (t
   assert.equal(await readFile(path.join(directory, 'unrelated'), 'utf8'), 'safe');
   assert.equal(await readFile(path.join(f.paths.VST3, 'Test.vst3/Contents/MacOS/Test'), 'utf8'), 'v1');
 });
+
+test('removes plugins when backup directory file IDs exceed Number precision', async (t) => {
+  const f = await fixture(t);
+  await f.installer.install({ plugin, tag: 'v1', formats: ['VST3'], ...await f.archive() });
+  const originalLstat = fs.lstat;
+  t.mock.method(fs, 'lstat', async (filename, options) => {
+    const info = await originalLstat(filename, options);
+    if (path.basename(filename).startsWith('.openvstmanager-backup-')) {
+      const ino = (1n << 60n) + BigInt(info.ino);
+      info.ino = options?.bigint ? ino : Number(ino);
+    }
+    return info;
+  });
+  assert.deepEqual(await f.installer.uninstall({ plugin, formats: ['VST3'] }), []);
+  await assert.rejects(stat(path.join(f.paths.VST3, 'Test.vst3')), { code: 'ENOENT' });
+});
+
+test('preserves exact large file identities and rejects adjacent identities rounded to the same Number', async (t) => {
+  const f = await fixture(t);
+  const originalLstat = fs.lstat;
+  t.mock.method(fs, 'lstat', async (filename, options) => {
+    const info = await originalLstat(filename, options);
+    const ino = (1n << 60n) + (BigInt(info.ino) % (1n << 48n)) * 256n;
+    info.ino = options?.bigint ? ino : Number(ino);
+    return info;
+  });
+  await f.installer.install({ plugin, tag: 'v1', formats: ['VST3'], ...await f.archive() });
+  const receiptPath = path.join(f.dataDir, 'receipts.json');
+  const receipts = JSON.parse(await readFile(receiptPath, 'utf8'));
+  const record = receipts.installs['test-plugin:VST3'];
+  const actual = await originalLstat(record.path, { bigint: true });
+  assert.equal(record.identity.ino, ((1n << 60n) + (actual.ino % (1n << 48n)) * 256n).toString());
+  const adjacent = (BigInt(record.identity.ino) + 1n).toString();
+  assert.equal(Number(adjacent), Number(record.identity.ino));
+  record.identity.ino = adjacent;
+  await writeFile(receiptPath, JSON.stringify(receipts));
+  assert.equal((await f.installer.detect(plugin))[0].managed, false);
+  await assert.rejects(f.installer.uninstall({ plugin, formats: ['VST3'] }), /ownership|changed/i);
+  assert.equal(await readFile(path.join(f.paths.VST3, 'Test.vst3/Contents/MacOS/Test'), 'utf8'), 'v1');
+});
+
+test('still recognizes and removes installations recorded with safe numeric identities', async (t) => {
+  const f = await fixture(t);
+  const originalLstat = fs.lstat;
+  t.mock.method(fs, 'lstat', async (filename, options) => {
+    const info = await originalLstat(filename, options);
+    for (const field of ['dev', 'ino']) {
+      const value = BigInt(info[field]) % (1n << 48n);
+      info[field] = options?.bigint ? value : Number(value);
+    }
+    return info;
+  });
+  await f.installer.install({ plugin, tag: 'v1', formats: ['VST3'], ...await f.archive() });
+  const receiptPath = path.join(f.dataDir, 'receipts.json');
+  const receipts = JSON.parse(await readFile(receiptPath, 'utf8'));
+  const identity = receipts.installs['test-plugin:VST3'].identity;
+  identity.dev = Number(identity.dev);
+  identity.ino = Number(identity.ino);
+  await writeFile(receiptPath, JSON.stringify(receipts));
+  const restarted = new Installer({ dataDir: f.dataDir, paths: f.paths, platform: 'darwin', plugins: [plugin] });
+  assert.equal((await restarted.detect(plugin))[0].managed, true);
+  assert.deepEqual(await restarted.uninstall({ plugin, formats: ['VST3'] }), []);
+});
