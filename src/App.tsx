@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { gt, valid } from 'semver';
 import {
   ArrowDownToLine, ArrowUpRight, AudioLines, Check, CheckCheck, ChevronDown,
   ChevronRight, CircleAlert, CircleCheck, Download, ExternalLink, Folder,
   Library, LoaderCircle, Monitor, Moon, RefreshCw, Search, Settings2, SlidersHorizontal,
   Sun, Trash2, WifiOff, X, Zap,
 } from 'lucide-react';
-import type { ManagerAPI, ManagerState, Plugin, PluginFormat, PluginRelease, Progress, Settings } from './types';
+import type { InstalledPlugin, ManagerAPI, ManagerState, Plugin, PluginFormat, PluginRelease, Progress, Settings } from './types';
 
 type View = 'library' | 'installed' | 'updates' | 'settings';
 type Busy = { id: string; action: string } | null;
@@ -20,21 +21,14 @@ function Github({ size = 16 }: { size?: number }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 19c-4.3 1.3-4.3-2.2-6-2.7m12 5v-3.9c0-1.1-.4-1.9-.9-2.4 3-.3 6.1-1.5 6.1-6.9 0-1.5-.5-2.7-1.4-3.7.1-.4.6-1.8-.1-3.6 0 0-1.2-.4-3.8 1.4a13 13 0 0 0-6.8 0C5.5.4 4.3.8 4.3.8c-.7 1.8-.2 3.2-.1 3.6a5.4 5.4 0 0 0-1.4 3.7c0 5.4 3.1 6.6 6.1 6.9-.4.4-.8 1.1-.9 2.1v4.2" transform="translate(1 1) scale(.9)" /></svg>;
 }
 
+function needsUpdate(installation: InstalledPlugin, release?: PluginRelease): boolean {
+  const current = valid(installation.version);
+  const latest = release && valid(release.tag);
+  return Boolean(installation.managed && isAvailable(release) && current && latest && gt(latest, current));
+}
+
 function hasUpdate(plugin: Plugin): boolean {
-  const latest = plugin.releases[0];
-  if (!latest || !isAvailable(latest)) return false;
-  return plugin.installed.some(installation => {
-    if (!installation.managed || formatVersion(installation.version) === formatVersion(latest.tag)) return false;
-    const currentIndex = plugin.releases.findIndex(release => formatVersion(release.tag) === formatVersion(installation.version));
-    if (currentIndex > 0) return true;
-    const current = formatVersion(installation.version).match(/^(\d+)\.(\d+)\.(\d+)/);
-    const next = formatVersion(latest.tag).match(/^(\d+)\.(\d+)\.(\d+)/);
-    if (!current || !next) return false;
-    for (let index = 1; index <= 3; index++) {
-      if (Number(next[index]) !== Number(current[index])) return Number(next[index]) > Number(current[index]);
-    }
-    return false;
-  });
+  return plugin.installed.some(installation => needsUpdate(installation, plugin.releases[0]));
 }
 
 function checkedTime(value: ManagerState['lastChecked']) {
@@ -158,7 +152,7 @@ export function App() {
     await operate('all', 'Updating plugins', async () => {
       let next = state!;
       for (const plugin of updates) {
-        const formats = plugin.installed.filter(item => item.managed && formatVersion(item.version) !== formatVersion(plugin.releases[0].tag)).map(item => item.format);
+        const formats = plugin.installed.filter(item => needsUpdate(item, plugin.releases[0])).map(item => item.format);
         if (formats.length) next = await manager.install({ id: plugin.id, tag: plugin.releases[0].tag, formats });
       }
       return next;
@@ -279,5 +273,5 @@ function SettingsPanel({ state, manager, busy, save, onError, openExternal }: { 
     catch (error) { onError(errorMessage(error)); }
     finally { setChoosing(false); }
   };
-  return <div className="settings-panel"><section className="settings-section"><h2>Installation folders</h2><p>New plugins install here. Existing installations stay in their current folders.</p>{formats.map(format => <div className="path-setting" key={format}><label htmlFor={`path-${format}`}>{format === 'AU' ? 'Audio Units' : 'VST3'}</label><div className="path-control"><Folder size={17} /><input id={`path-${format}`} value={draft.paths[format]} onChange={event => setDraft(current => ({ ...current, paths: { ...current.paths, [format]: event.target.value } }))} spellCheck={false} autoComplete="off" disabled={Boolean(busy) || choosing} /><button className="button button-secondary" onClick={() => void choose(format)} disabled={Boolean(busy) || choosing}>Choose folder</button></div></div>)}{state.platform === 'win32' && <p className="settings-hint">Add your VST3 folder to your DAW’s plugin search paths, then rescan.</p>}</section><section className="settings-section release-settings"><div><h2>Prereleases</h2><p>Include early versions when checking for updates.</p></div><button type="button" role="switch" aria-checked={draft.includePrereleases} aria-label="Include prereleases" className={`switch ${draft.includePrereleases ? 'switch-on' : ''}`} disabled={Boolean(busy)} onClick={() => setDraft(current => ({ ...current, includePrereleases: !current.includePrereleases }))}><span /></button></section><div className="settings-actions"><span>{changed ? 'You have unsaved changes.' : 'Your preferences are saved on this computer.'}</span><button className="button button-primary" disabled={!changed || Boolean(busy) || choosing || formats.some(format => !draft.paths[format]?.trim())} onClick={() => void save(draft)}>{busy?.id === 'settings' ? <LoaderCircle size={15} className="spin" /> : <Check size={15} />}Save changes</button></div><div className="about-settings"><AudioLines size={21} strokeWidth={1.5} /><div><span>OpenVST Manager {state.appVersion}</span><p>{platformName(state.platform)} {state.arch}</p></div><button className="button button-quiet" onClick={() => void openExternal('https://github.com/alanmarcero/alan-m-OpenVSTManager/releases/latest')}>Manager releases<ArrowUpRight size={13} /></button></div></div>;
+  return <div className="settings-panel"><section className="settings-section"><h2>Installation folders</h2><p>New plugins install here. Existing installations move here when you next install or update them.</p>{formats.map(format => <div className="path-setting" key={format}><label htmlFor={`path-${format}`}>{format === 'AU' ? 'Audio Units' : 'VST3'}</label><div className="path-control"><Folder size={17} /><input id={`path-${format}`} value={draft.paths[format]} onChange={event => setDraft(current => ({ ...current, paths: { ...current.paths, [format]: event.target.value } }))} spellCheck={false} autoComplete="off" disabled={Boolean(busy) || choosing} /><button className="button button-secondary" onClick={() => void choose(format)} disabled={Boolean(busy) || choosing}>Choose folder</button></div></div>)}{state.platform === 'win32' && <p className="settings-hint">Add your VST3 folder to your DAW’s plugin search paths, then rescan.</p>}</section><section className="settings-section release-settings"><div><h2>Prereleases</h2><p>Include early versions when checking for updates.</p></div><button type="button" role="switch" aria-checked={draft.includePrereleases} aria-label="Include prereleases" className={`switch ${draft.includePrereleases ? 'switch-on' : ''}`} disabled={Boolean(busy)} onClick={() => setDraft(current => ({ ...current, includePrereleases: !current.includePrereleases }))}><span /></button></section><div className="settings-actions"><span>{changed ? 'You have unsaved changes.' : 'Your preferences are saved on this computer.'}</span><button className="button button-primary" disabled={!changed || Boolean(busy) || choosing || formats.some(format => !draft.paths[format]?.trim())} onClick={() => void save(draft)}>{busy?.id === 'settings' ? <LoaderCircle size={15} className="spin" /> : <Check size={15} />}Save changes</button></div><div className="about-settings"><AudioLines size={21} strokeWidth={1.5} /><div><span>OpenVST Manager {state.appVersion}</span><p>{platformName(state.platform)} {state.arch}</p></div><button className="button button-quiet" onClick={() => void openExternal('https://github.com/alanmarcero/alan-m-OpenVSTManager/releases/latest')}>Manager releases<ArrowUpRight size={13} /></button></div></div>;
 }

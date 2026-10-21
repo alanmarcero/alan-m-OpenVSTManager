@@ -14,14 +14,20 @@ export function defaultPaths({ platform = process.platform, home = homedir(), en
 }
 
 async function exists(filename) {
-  try { return await fs.lstat(filename); } catch (error) { if (error.code === 'ENOENT') return null; throw error; }
+  try { return await fs.lstat(filename, { bigint: true }); } catch (error) { if (error.code === 'ENOENT') return null; throw error; }
 }
 
 function sameIdentity(info, identity) {
-  return info && !info.isSymbolicLink() && info.dev === identity.dev && info.ino === identity.ino;
+  return info && !info.isSymbolicLink() && String(info.dev) === String(identity.dev) && String(info.ino) === String(identity.ino);
 }
 
-function identity(info) { return { dev: info.dev, ino: info.ino }; }
+function validIdentityPart(value) {
+  return (Number.isSafeInteger(value) && value >= 0)
+    || (typeof value === 'string' && /^(0|[1-9][0-9]{0,19})$/.test(value) && BigInt(value) <= 0xffffffffffffffffn);
+}
+
+// NTFS file IDs can exceed Number precision; JSON stores their exact decimal representation.
+function identity(info) { return { dev: String(info.dev), ino: String(info.ino) }; }
 
 function bundleNames(plugin, format) {
   const value = plugin.bundleNames?.[format];
@@ -41,7 +47,7 @@ function validateRecord(record, plugin, format) {
     || typeof record.path !== 'string' || typeof record.root !== 'string' || !path.isAbsolute(record.path) || !path.isAbsolute(record.root)
     || path.normalize(record.path) !== record.path || path.normalize(record.root) !== record.root
     || record.path !== path.join(record.root, record.bundleName) || typeof record.version !== 'string'
-    || !Number.isSafeInteger(record.identity?.dev) || !Number.isSafeInteger(record.identity?.ino)) {
+    || !validIdentityPart(record.identity?.dev) || !validIdentityPart(record.identity?.ino)) {
     throw new Error(`Invalid installation receipt for ${plugin.id} ${format}; no files were removed`);
   }
 }
@@ -49,9 +55,8 @@ function validateRecord(record, plugin, format) {
 async function ownsRecord(record) {
   const info = await exists(record.path);
   if (!info) return false;
-  return !info.isSymbolicLink() && (info.isDirectory() || info.isFile())
-    && await fs.realpath(record.root) === record.root
-    && info.dev === record.identity.dev && info.ino === record.identity.ino;
+  return sameIdentity(info, record.identity) && (info.isDirectory() || info.isFile())
+    && await fs.realpath(record.root) === record.root;
 }
 
 async function verifyDigest(filename, digest) {
@@ -173,7 +178,7 @@ export class Installer {
     for (const directory of journal.directories) {
       if (!directory || typeof directory.path !== 'string' || !roots.has(directory.root)
         || path.dirname(directory.path) !== directory.root || !/^\.openvstmanager-(?:backup-)?[a-z0-9]{6}$/i.test(path.basename(directory.path))
-        || !Number.isSafeInteger(directory.identity?.dev) || !Number.isSafeInteger(directory.identity?.ino)
+        || !validIdentityPart(directory.identity?.dev) || !validIdentityPart(directory.identity?.ino)
         || directories.has(directory.path)) throw new Error('Invalid journal staging directory');
       const info = await exists(directory.path);
       if (info && (!info.isDirectory() || !sameIdentity(info, directory.identity))) throw new Error('Installation recovery staging directory changed');
@@ -321,7 +326,7 @@ export class Installer {
     let journalWritten = false;
     const directory = async (root, prefix) => {
       const filename = await fs.mkdtemp(path.join(root, prefix));
-      journal.directories.push({ path: filename, root, identity: identity(await fs.lstat(filename)) });
+      journal.directories.push({ path: filename, root, identity: identity(await fs.lstat(filename, { bigint: true })) });
       return filename;
     };
     try {
@@ -331,7 +336,7 @@ export class Installer {
         if (change.source) {
           entry.prepared = path.join(await directory(change.root, '.openvstmanager-'), change.bundleName);
           await fs.cp(change.source, entry.prepared, { recursive: true, force: false, errorOnExist: true });
-          entry.next = { pluginId: change.key.slice(0, change.key.lastIndexOf(':')), format: change.format, bundleName: change.bundleName, path: change.target, root: change.root, version, identity: identity(await fs.lstat(entry.prepared)) };
+          entry.next = { pluginId: change.key.slice(0, change.key.lastIndexOf(':')), format: change.format, bundleName: change.bundleName, path: change.target, root: change.root, version, identity: identity(await fs.lstat(entry.prepared, { bigint: true })) };
           next.installs[change.key] = entry.next;
         } else delete next.installs[change.key];
         if (change.previous && await exists(change.previous.path)) {

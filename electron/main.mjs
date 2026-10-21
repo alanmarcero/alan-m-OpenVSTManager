@@ -10,7 +10,7 @@ const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const origin='openvst://app';
 app.setName('OpenVST Manager');
 protocol.registerSchemesAsPrivileged([{scheme:'openvst',privileges:{standard:true,secure:true,supportFetchAPI:true}}]);
-if(process.env.OPENVST_DATA_DIR && !app.isPackaged)app.setPath('userData',path.resolve(process.env.OPENVST_DATA_DIR));
+if(process.env.OPENVST_DATA_DIR)app.setPath('userData',path.resolve(process.env.OPENVST_DATA_DIR));
 if(!app.requestSingleInstanceLock())app.quit();
 else {
   let window;

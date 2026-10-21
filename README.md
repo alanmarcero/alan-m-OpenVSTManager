@@ -14,9 +14,18 @@ A quiet home for Alan Marcero's audio plugins. Browse releases, install the form
 
 The catalog includes openGlitchFX, openEDMFilter, openSausage, openTunerEQ, openMaster, Winamp Classic Equalizer, and Winamp Classic Visualizer. Each plugin links to its source and release notes. Download availability depends on its published releases and your platform.
 
+<details>
+<summary>Dark and Cyberpunk previews</summary>
+
+![Dark theme](docs/screenshots/dark.png)
+![Cyberpunk theme](docs/screenshots/cyberpunk.png)
+
+[Generated cyberpunk studio artwork](public/artwork/cyberpunk-studio.png)
+</details>
+
 ## Install the manager
 
-**macOS:** download the `arm64.dmg` for Apple Silicon or `x64.dmg` for Intel, then drag OpenVST Manager into Applications. Current builds are ad-hoc signed, not Apple-notarized. macOS may require opening System Settings → Privacy & Security → Open Anyway after the first launch attempt. macOS 12 or later is required. If macOS reports the downloaded app as damaged, verify its checksum against `SHA256SUMS.txt` before clearing quarantine for this app only:
+**macOS:** download the `arm64.dmg` for Apple Silicon or `x64.dmg` for Intel, then drag OpenVST Manager into Applications. Current builds are ad-hoc signed, not Apple-notarized. macOS may require opening System Settings → Privacy & Security → Open Anyway after the first launch attempt. macOS 13 or later is required. If macOS reports the downloaded app as damaged, verify its checksum against `SHA256SUMS.txt` before clearing quarantine for this app only:
 
 ```sh
 xattr -dr com.apple.quarantine '/Applications/OpenVST Manager.app'
@@ -38,7 +47,7 @@ Windows uses a writable user folder. Add that folder to your DAW's VST3 search p
 
 Existing external plugins are shown with an unknown version and are not overwritten or removed. Move an external copy yourself before installing a managed copy. When changing the installation folder, old managed files remain tracked and are moved on the next installation/update. Removal uses receipts and file ownership checks, never broad folder deletion.
 
-ZIP downloads are checked against GitHub's SHA-256 digest when supplied. Extraction rejects path traversal, symlinks, conflicting names and oversized archives. Replacements are staged with rollback; installation receipts record the exact version and paths.
+ZIP downloads are checked against GitHub's SHA-256 digest when supplied. Extraction rejects path traversal, symlinks, conflicting names and oversized archives. Replacements are staged with rollback; installation receipts record the exact version and paths. A validated transaction journal recovers interrupted replacements or removals on the next launch.
 
 ## Build and run
 
@@ -55,6 +64,8 @@ npm start
 
 ```sh
 npm run check        # core tests, TypeScript and frontend build
+npx playwright install chromium
+npm run test:ui      # theme, layout and interaction regressions
 npm run test:desktop # live macOS/Electron install/remove smoke test, isolated temp folders
 npm run dist:mac     # macOS arm64 + x64 DMGs, on macOS
 npm run dist:win     # Windows x64 setup EXE, on Windows
@@ -84,7 +95,7 @@ npm run cli -- paths
 npm run cli -- paths VST3 /absolute/path/to/plugins
 ```
 
-Use `--data-dir /absolute/path` for isolated settings and receipts. Do not run the CLI and desktop app against the same settings directory concurrently.
+Use `--data-dir /absolute/path` for isolated CLI settings and receipts. The desktop app also accepts the `OPENVST_DATA_DIR` environment variable. Do not run the CLI and desktop app against the same settings directory concurrently.
 
 Settings, receipts, cache and a bounded activity log live in Electron's user-data directory: `~/Library/Application Support/OpenVST Manager` on macOS, `%APPDATA%/OpenVST Manager` on Windows, and `$XDG_CONFIG_HOME/OpenVST Manager` (normally `~/.config/OpenVST Manager`) on Linux. Theme choice is stored in the local renderer profile.
 
