@@ -19,6 +19,10 @@ const initialState: ManagerState = {
   platform: 'darwin', arch: 'arm64', appVersion: '0.1.0',
   lastChecked: '2026-10-21T12:00:00Z', offline: false,
   settings: { includePrereleases: false, paths: { VST3: '/tmp/openvst-test/VST3', AU: '/tmp/openvst-test/Components' } },
+  pathOptions: {
+    VST3: [{ label: 'User folder', path: '/tmp/openvst-test/VST3' }, { label: 'System folder', path: '/Library/Audio/Plug-Ins/VST3' }],
+    AU: [{ label: 'User folder', path: '/tmp/openvst-test/Components' }, { label: 'System folder', path: '/Library/Audio/Plug-Ins/Components' }],
+  },
   plugins: catalog.map(plugin => ({
     ...plugin,
     url: `https://github.com/alanmarcero/${plugin.repo}`,
@@ -119,6 +123,18 @@ for (const theme of ['Light', 'Dark', 'Cyberpunk']) {
     });
   }
 }
+
+test('can select installation folder from options and save', async ({ page }) => {
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  const select = page.getByRole('combobox', { name: 'VST3 location' });
+  await expect(select).toBeVisible();
+  await select.selectOption('/Library/Audio/Plug-Ins/VST3');
+  await expect(page.locator('#path-VST3')).toHaveValue('/Library/Audio/Plug-Ins/VST3');
+  await page.getByRole('button', { name: 'Save changes', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Save changes', exact: true })).toBeDisabled();
+  const savedState = await page.evaluate(() => window.__managerTest.state);
+  expect(savedState.settings.paths.VST3).toBe('/Library/Audio/Plug-Ins/VST3');
+});
 
 test('successful install and confirmed removal still complete with stale metadata', async ({ page }) => {
   await page.evaluate(() => {

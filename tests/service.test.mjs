@@ -26,6 +26,13 @@ test('settings persist and invalid plugin or format cannot reach install',async 
  await assert.rejects(()=>service.install({id:'openMaster',tag:'v1',formats:['AU']}),/format/i);
  await assert.rejects(()=>service.saveSettings({includePrereleases:'yes'}),/boolean/);
 });
+test('state includes pathOptions with available folder options',async t=>{
+ const {service}=await setup(t);
+ const state=await service.getState();
+ assert.ok(state.pathOptions?.VST3?.length);
+ assert.equal(state.pathOptions.VST3[0].label,'User folder (~/Library)');
+ assert.equal(state.pathOptions.VST3[1].path,'/Library/Audio/Plug-Ins/VST3');
+});
 test('failed activity logging cannot turn a committed operation into an error',async t=>{
  const {service}=await setup(t);await service.getState();
  service.log=async()=>{throw new Error('log is read-only');};

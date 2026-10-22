@@ -40,6 +40,11 @@ export interface Plugin {
   notice?: string;
 }
 
+export interface PathOption {
+  label: string;
+  path: string;
+}
+
 export interface Settings {
   includePrereleases: boolean;
   paths: Record<PluginFormat, string>;
@@ -51,6 +56,7 @@ export interface ManagerState {
   appVersion: string;
   plugins: Plugin[];
   settings: Settings;
+  pathOptions?: Partial<Record<PluginFormat, PathOption[]>>;
   lastChecked: string | number | null;
   offline: boolean;
   error?: string;

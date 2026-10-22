@@ -8,7 +8,7 @@ import { crc32 } from 'node:zlib';
 import fs from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { Installer, defaultPaths } from '../core/installer.mjs';
+import { Installer, defaultPaths, standardPathOptions } from '../core/installer.mjs';
 
 const plugin = { id: 'test-plugin', bundleNames: { VST3: 'Test.vst3', AU: 'Test.component' } };
 
@@ -48,6 +48,22 @@ test('provides per-user paths for supported operating systems', () => {
   assert.deepEqual(defaultPaths({ platform: 'darwin', home: '/home/test' }), { VST3: '/home/test/Library/Audio/Plug-Ins/VST3', AU: '/home/test/Library/Audio/Plug-Ins/Components' });
   assert.deepEqual(defaultPaths({ platform: 'linux', home: '/home/test' }), { VST3: '/home/test/.vst3' });
   assert.equal(defaultPaths({ platform: 'win32', home: 'C:\\Users\\Test', env: { LOCALAPPDATA: 'C:\\Users\\Test\\AppData\\Local' } }).VST3, 'C:\\Users\\Test\\AppData\\Local\\Programs\\Common\\VST3');
+});
+
+test('provides standard install folder options including system VST3 folder', () => {
+  const win = standardPathOptions({ platform: 'win32', home: 'C:\\Users\\Test', env: { LOCALAPPDATA: 'C:\\Users\\Test\\AppData\\Local' } });
+  assert.equal(win.VST3[0].path, 'C:\\Users\\Test\\AppData\\Local\\Programs\\Common\\VST3');
+  assert.equal(win.VST3[1].path, 'C:\\Program Files\\Common Files\\VST3');
+
+  const mac = standardPathOptions({ platform: 'darwin', home: '/home/test' });
+  assert.equal(mac.VST3[0].path, '/home/test/Library/Audio/Plug-Ins/VST3');
+  assert.equal(mac.VST3[1].path, '/Library/Audio/Plug-Ins/VST3');
+  assert.equal(mac.AU[0].path, '/home/test/Library/Audio/Plug-Ins/Components');
+  assert.equal(mac.AU[1].path, '/Library/Audio/Plug-Ins/Components');
+
+  const linux = standardPathOptions({ platform: 'linux', home: '/home/test' });
+  assert.equal(linux.VST3[0].path, '/home/test/.vst3');
+  assert.equal(linux.VST3[1].path, '/usr/lib/vst3');
 });
 
 test('installs selected formats, persists versions, replaces them and removes only managed bundles', async (t) => {

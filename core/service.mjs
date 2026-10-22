@@ -3,6 +3,7 @@ import path from 'node:path';
 import {readJSON,writeJSON} from './storage.mjs';
 import {validateCatalog,normalizeReleases,selectAsset} from './releases.mjs';
 import {downloadAsset} from './download.mjs';
+import {standardPathOptions} from './installer.mjs';
 
 export class ManagerService {
   constructor({dataDir,client,installer,platform=process.platform,arch=process.arch,appVersion,bundledCatalog,onProgress=()=>{}}) {
@@ -27,7 +28,7 @@ export class ManagerService {
         ...(result?.error ? {error:result.error} : {})};
     }));
     const fetched=[...this.releases.values()].map(r=>r.fetchedAt).filter(Boolean);
-    return {platform:this.platform,arch:this.arch,appVersion:this.appVersion,settings:this.settings,plugins,
+    return {platform:this.platform,arch:this.arch,appVersion:this.appVersion,settings:this.settings,plugins,pathOptions:standardPathOptions({platform:this.platform}),
       lastChecked:fetched.length?new Date(Math.min(...fetched)).toISOString():null,
       offline:[...this.releases.values()].some(r=>r.stale),
       ...(this.catalogError ? {error:this.catalogError} : {})};

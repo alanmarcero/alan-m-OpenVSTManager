@@ -6,7 +6,7 @@ import {
   Library, LoaderCircle, Monitor, Moon, RefreshCw, Search, Settings2, SlidersHorizontal,
   Sun, Trash2, WifiOff, X, Zap,
 } from 'lucide-react';
-import type { InstalledPlugin, ManagerAPI, ManagerState, Plugin, PluginFormat, PluginRelease, Progress, Settings } from './types';
+import type { InstalledPlugin, ManagerAPI, ManagerState, PathOption, Plugin, PluginFormat, PluginRelease, Progress, Settings } from './types';
 
 type View = 'library' | 'installed' | 'updates' | 'settings';
 type Busy = { id: string; action: string } | null;
@@ -263,6 +263,31 @@ function ConfirmDialog({ title, description, busy, onCancel, onConfirm }: { titl
 }
 
 function SettingsPanel({ state, manager, busy, save, onError, openExternal }: { state: ManagerState; manager: ManagerAPI; busy: Busy; save: (settings: Settings) => Promise<boolean>; onError: (message: string) => void; openExternal: (url: string) => Promise<void> }) {
+  const normalize = (p: string) => {
+    const trimmed = (p || '').trim();
+    if (state.platform === 'win32') return trimmed.replace(/[\\/]+/g, '\\').replace(/\\$/, '').toLowerCase();
+    return trimmed.replace(/\/+$/, '');
+  };
+  const getOptions = (format: PluginFormat): PathOption[] => {
+    if (state.pathOptions?.[format]?.length) return state.pathOptions[format]!;
+    if (state.platform === 'win32') {
+      const userPath = draft.paths[format]?.toLowerCase().includes('appdata') ? draft.paths[format] : 'C:\\Users\\User\\AppData\\Local\\Programs\\Common\\VST3';
+      return [
+        { label: 'User folder', path: userPath },
+        { label: 'Program Files', path: 'C:\\Program Files\\Common Files\\VST3' },
+      ];
+    }
+    if (state.platform === 'darwin') {
+      return [
+        { label: 'User folder (~/Library)', path: format === 'AU' ? '~/Library/Audio/Plug-Ins/Components' : '~/Library/Audio/Plug-Ins/VST3' },
+        { label: 'System folder (/Library)', path: format === 'AU' ? '/Library/Audio/Plug-Ins/Components' : '/Library/Audio/Plug-Ins/VST3' },
+      ];
+    }
+    return [
+      { label: 'User folder (~/.vst3)', path: '~/.vst3' },
+      { label: 'System folder (/usr/lib/vst3)', path: '/usr/lib/vst3' },
+    ];
+  };
   const [draft, setDraft] = useState<Settings>(state.settings);
   const [choosing, setChoosing] = useState(false);
   const changed = JSON.stringify(draft) !== JSON.stringify(state.settings);
@@ -273,5 +298,11 @@ function SettingsPanel({ state, manager, busy, save, onError, openExternal }: { 
     catch (error) { onError(errorMessage(error)); }
     finally { setChoosing(false); }
   };
-  return <div className="settings-panel"><section className="settings-section"><h2>Installation folders</h2><p>New plugins install here. Existing installations move here when you next install or update them.</p>{formats.map(format => <div className="path-setting" key={format}><label htmlFor={`path-${format}`}>{format === 'AU' ? 'Audio Units' : 'VST3'}</label><div className="path-control"><Folder size={17} /><input id={`path-${format}`} value={draft.paths[format]} onChange={event => setDraft(current => ({ ...current, paths: { ...current.paths, [format]: event.target.value } }))} spellCheck={false} autoComplete="off" disabled={Boolean(busy) || choosing} /><button className="button button-secondary" onClick={() => void choose(format)} disabled={Boolean(busy) || choosing}>Choose folder</button></div></div>)}{state.platform === 'win32' && <p className="settings-hint">Add your VST3 folder to your DAW’s plugin search paths, then rescan.</p>}</section><section className="settings-section release-settings"><div><h2>Prereleases</h2><p>Include early versions when checking for updates.</p></div><button type="button" role="switch" aria-checked={draft.includePrereleases} aria-label="Include prereleases" className={`switch ${draft.includePrereleases ? 'switch-on' : ''}`} disabled={Boolean(busy)} onClick={() => setDraft(current => ({ ...current, includePrereleases: !current.includePrereleases }))}><span /></button></section><div className="settings-actions"><span>{changed ? 'You have unsaved changes.' : 'Your preferences are saved on this computer.'}</span><button className="button button-primary" disabled={!changed || Boolean(busy) || choosing || formats.some(format => !draft.paths[format]?.trim())} onClick={() => void save(draft)}>{busy?.id === 'settings' ? <LoaderCircle size={15} className="spin" /> : <Check size={15} />}Save changes</button></div><div className="about-settings"><AudioLines size={21} strokeWidth={1.5} /><div><span>OpenVST Manager {state.appVersion}</span><p>{platformName(state.platform)} {state.arch}</p></div><button className="button button-quiet" onClick={() => void openExternal('https://github.com/alanmarcero/alan-m-OpenVSTManager/releases/latest')}>Manager releases<ArrowUpRight size={13} /></button></div></div>;
+  return <div className="settings-panel"><section className="settings-section"><h2>Installation folders</h2><p>New plugins install here. Existing installations move here when you next install or update them.</p>{formats.map(format => {
+    const options = getOptions(format);
+    const currentPath = draft.paths[format] || '';
+    const matchingOption = options.find(opt => normalize(opt.path) === normalize(currentPath));
+    const selectValue = matchingOption ? matchingOption.path : '__custom__';
+    return <div className="path-setting" key={format}><label htmlFor={`path-select-${format}`}>{format === 'AU' ? 'Audio Units' : 'VST3'}</label><div className="path-preset-select"><select id={`path-select-${format}`} aria-label={`${format === 'AU' ? 'Audio Units' : 'VST3'} location`} value={selectValue} onChange={event => { const next = event.target.value; if (next !== '__custom__') setDraft(current => ({ ...current, paths: { ...current.paths, [format]: next } })); }} disabled={Boolean(busy) || choosing}>{options.map(option => <option key={option.path} value={option.path}>{option.label} ({option.path})</option>)}<option value="__custom__">Custom folder…</option></select><ChevronDown size={14} /></div><div className="path-control"><Folder size={17} /><input id={`path-${format}`} aria-label={`${format === 'AU' ? 'Audio Units' : 'VST3'} path`} value={draft.paths[format]} onChange={event => setDraft(current => ({ ...current, paths: { ...current.paths, [format]: event.target.value } }))} spellCheck={false} autoComplete="off" disabled={Boolean(busy) || choosing} /><button className="button button-secondary" onClick={() => void choose(format)} disabled={Boolean(busy) || choosing}>Choose folder</button></div></div>;
+  })}{state.platform === 'win32' && <p className="settings-hint">Add your VST3 folder to your DAW’s plugin search paths, then rescan.</p>}</section><section className="settings-section release-settings"><div><h2>Prereleases</h2><p>Include early versions when checking for updates.</p></div><button type="button" role="switch" aria-checked={draft.includePrereleases} aria-label="Include prereleases" className={`switch ${draft.includePrereleases ? 'switch-on' : ''}`} disabled={Boolean(busy)} onClick={() => setDraft(current => ({ ...current, includePrereleases: !current.includePrereleases }))}><span /></button></section><div className="settings-actions"><span>{changed ? 'You have unsaved changes.' : 'Your preferences are saved on this computer.'}</span><button className="button button-primary" disabled={!changed || Boolean(busy) || choosing || formats.some(format => !draft.paths[format]?.trim())} onClick={() => void save(draft)}>{busy?.id === 'settings' ? <LoaderCircle size={15} className="spin" /> : <Check size={15} />}Save changes</button></div><div className="about-settings"><AudioLines size={21} strokeWidth={1.5} /><div><span>OpenVST Manager {state.appVersion}</span><p>{platformName(state.platform)} {state.arch}</p></div><button className="button button-quiet" onClick={() => void openExternal('https://github.com/alanmarcero/alan-m-OpenVSTManager/releases/latest')}>Manager releases<ArrowUpRight size={13} /></button></div></div>;
 }
