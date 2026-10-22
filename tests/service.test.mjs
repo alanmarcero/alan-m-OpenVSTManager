@@ -40,3 +40,28 @@ test('failed activity logging cannot turn a committed operation into an error',a
  const result=await service.operate('openMaster',async()=>{committed=true;});
  assert.equal(committed,true);assert.equal(result.plugins.length,1);
 });
+
+test('service routes move, moveAll, and overwrite/unmanaged flags correctly', async t => {
+  const {service}=await setup(t);
+  let installOptions = null;
+  let moveOptions = null;
+  let uninstallOptions = null;
+  service.installer.install = async (opts) => { installOptions = opts; return []; };
+  service.installer.move = async (opts) => { moveOptions = opts; return []; };
+  service.installer.uninstall = async (opts) => { uninstallOptions = opts; return []; };
+  service.installer.detect = async () => [{ format: 'VST3', version: 'v1', managed: true }];
+  service.releases.set('openMaster', {
+    data: [{ tag_name: 'v1.0.0', published_at: '2026-10-20T00:00:00Z', assets: [{ name: 'openMaster-macOS.zip', browser_download_url: 'https://example.com/asset.zip', size: 100 }] }],
+    fetchedAt: 12345,
+  });
+
+  await service.move({ id: 'openMaster', formats: ['VST3'], overwrite: true });
+  assert.equal(moveOptions.overwrite, true);
+  assert.deepEqual(moveOptions.formats, ['VST3']);
+
+  await service.moveAll();
+  assert.ok(moveOptions);
+
+  await service.uninstall({ id: 'openMaster', formats: ['VST3'], unmanaged: true });
+  assert.equal(uninstallOptions.unmanaged, true);
+});

@@ -111,16 +111,38 @@ export class ManagerService {
           this.progress(plugin.id,'downloading','Downloading from GitHub',0);
           await downloadAsset({asset,repo:plugin.repo,destination:archivePath,onProgress:percent=>this.progress(plugin.id,'downloading','Downloading from GitHub',percent)});
           this.progress(plugin.id,'installing','Verifying and installing');
-          await this.installer.install({plugin,tag:release.tag,archivePath,formats,digest:asset.digest});
+          await this.installer.install({plugin,tag:release.tag,archivePath,formats,digest:asset.digest,overwrite:Boolean(request.overwrite)});
         }
       }finally{await rm(temporary,{recursive:true,force:true}).catch(()=>{});}
+    });
+  }
+  async move(request){
+    await this.getState();const plugin=this.selection(request);
+    return this.operate(plugin.id,async()=>{
+      this.progress(plugin.id,'moving','Moving to new folder');
+      await this.installer.move({plugin,formats:request.formats,overwrite:Boolean(request.overwrite)});
+    });
+  }
+  async moveAll(){
+    await this.getState();
+    const plugins=this.catalog;
+    return this.operate('all',async()=>{
+      this.progress('all','moving','Moving installed plugins to current folder',0);
+      for(const [index,plugin] of plugins.entries()){
+        const installed=await this.installer.detect(plugin);
+        const formats=installed.filter(i=>i.managed).map(item=>item.format);
+        if(formats.length){
+          await this.installer.move({plugin,formats,overwrite:true}).catch(()=>{});
+        }
+        this.progress('all','moving','Moving installed plugins to current folder',Math.round(((index+1)/plugins.length)*100));
+      }
     });
   }
   async uninstall(request){
     await this.getState();const plugin=this.selection(request);
     return this.operate(plugin.id,async()=>{
-      this.progress(plugin.id,'removing','Removing managed files');
-      await this.installer.uninstall({plugin,formats:request.formats});
+      this.progress(plugin.id,'removing','Removing files');
+      await this.installer.uninstall({plugin,formats:request.formats,unmanaged:Boolean(request.unmanaged)});
     });
   }
 }

@@ -378,3 +378,41 @@ test('still recognizes and removes installations recorded with safe numeric iden
   assert.equal((await restarted.detect(plugin))[0].managed, true);
   assert.deepEqual(await restarted.uninstall({ plugin, formats: ['VST3'] }), []);
 });
+
+
+test('can overwrite an existing unmanaged plugin when overwrite option is true', async (t) => {
+  const f = await fixture(t);
+  await mkdir(path.join(f.paths.VST3, 'Test.vst3'), { recursive: true });
+  await writeFile(path.join(f.paths.VST3, 'Test.vst3', 'external'), 'unmanaged');
+  assert.deepEqual(await f.installer.detect(plugin), [{ format: 'VST3', version: null, path: path.join(f.paths.VST3, 'Test.vst3'), managed: false }]);
+  
+  const result = await f.installer.install({ plugin, tag: 'v1', formats: ['VST3'], overwrite: true, ...await f.archive() });
+  assert.equal(result.length, 1);
+  assert.equal(result[0].managed, true);
+  assert.equal(result[0].version, 'v1');
+  assert.equal(await readFile(path.join(f.paths.VST3, 'Test.vst3/Contents/MacOS/Test'), 'utf8'), 'v1');
+});
+
+test('can move an installed plugin to a new directory', async (t) => {
+  const f = await fixture(t);
+  await f.installer.install({ plugin, tag: 'v1', formats: ['VST3'], ...await f.archive() });
+  const newDir = path.join(f.root, 'new-vst3');
+  f.installer.setPaths({ VST3: newDir });
+  
+  const result = await f.installer.move({ plugin, formats: ['VST3'] });
+  assert.equal(result.length, 1);
+  assert.equal(result[0].managed, true);
+  assert.equal(result[0].path, path.join(newDir, 'Test.vst3'));
+  assert.equal(await readFile(path.join(newDir, 'Test.vst3/Contents/MacOS/Test'), 'utf8'), 'v1');
+  await assert.rejects(stat(path.join(f.paths.VST3, 'Test.vst3')), { code: 'ENOENT' });
+});
+
+test('can uninstall an unmanaged plugin when unmanaged option is true', async (t) => {
+  const f = await fixture(t);
+  await mkdir(path.join(f.paths.VST3, 'Test.vst3'), { recursive: true });
+  await writeFile(path.join(f.paths.VST3, 'Test.vst3', 'external'), 'unmanaged');
+  assert.deepEqual(await f.installer.detect(plugin), [{ format: 'VST3', version: null, path: path.join(f.paths.VST3, 'Test.vst3'), managed: false }]);
+
+  assert.deepEqual(await f.installer.uninstall({ plugin, formats: ['VST3'], unmanaged: true }), []);
+  await assert.rejects(stat(path.join(f.paths.VST3, 'Test.vst3')), { code: 'ENOENT' });
+});

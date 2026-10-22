@@ -38,6 +38,7 @@ else {
   const handlers={
     getState:()=>manager.getState(),refresh:()=>manager.refresh(),
     install:request=>manager.install(request),uninstall:request=>manager.uninstall(request),
+    move:request=>manager.move(request),moveAll:()=>manager.moveAll(),
     saveSettings:patch=>manager.saveSettings(patch),
     chooseDirectory:async format=>{
       if(!['VST3','AU'].includes(format))throw new Error('Unknown plugin format.');

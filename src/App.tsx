@@ -116,7 +116,6 @@ export function App() {
       return true;
     } catch (error) {
       setNotice({ message: errorMessage(error), kind: 'error' });
-      // Reconcile receipts even if a multi-format operation only partly completed.
       try { if (manager) setState(await manager.getState()); } catch { /* Keep the last known state visible. */ }
       return false;
     } finally {
@@ -189,11 +188,11 @@ export function App() {
           : loadError || !state ? <div className="state-screen"><span className="state-symbol"><CircleAlert size={31} strokeWidth={1.5} /></span><h2>Couldn’t open your library</h2><p>{loadError || 'The desktop app did not return a library.'}</p><button className="button button-primary" onClick={() => void load()}>Try again</button></div>
             : <>
               {(state.offline || state.error) && <div className="connection-notice" role="status">{state.offline ? <WifiOff size={17} /> : <CircleAlert size={17} />}<span>{state.error || 'You’re offline. Showing your saved releases; reconnect to check for updates.'}</span></div>}
-              {view === 'settings' ? <SettingsPanel key={JSON.stringify(state.settings)} state={state} manager={manager} busy={busy} save={settings => operate('settings', 'Saving settings', () => manager.saveSettings(settings), 'Settings saved.')} onError={message => setNotice({ kind: 'error', message })} openExternal={openExternal} />
+              {view === 'settings' ? <SettingsPanel key={JSON.stringify(state.settings)} state={state} manager={manager} busy={busy} save={settings => operate('settings', 'Saving settings', () => manager.saveSettings(settings), 'Settings saved.')} onError={message => setNotice({ kind: 'error', message })} openExternal={openExternal} operate={operate} />
                 : <>
                   <section className="library-toolbar" aria-label="Filter plugins"><div className="search-field"><Search size={17} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search plugins" aria-label="Search plugins" />{query && <button className="icon-button clear-search" aria-label="Clear search" onClick={() => setQuery('')}><X size={14} /></button>}</div><div className="category-select"><SlidersHorizontal size={15} /><select aria-label="Category" value={category} onChange={event => setCategory(event.target.value)}><option>All categories</option>{categories.map(item => <option key={item}>{item}</option>)}</select><ChevronDown size={13} /></div>{view === 'updates' && updateCount > 0 ? <button className="button button-primary update-all" disabled={Boolean(busy)} onClick={() => void updateAll()}><Download size={15} />Update all</button> : <span className="result-count">{visible.length} {visible.length === 1 ? 'plugin' : 'plugins'}</span>}</section>
                   {visible.length === 0 ? <div className="state-screen empty-state"><span className="state-symbol">{view === 'updates' && !query && category === 'All categories' ? <CheckCheck size={31} strokeWidth={1.5} /> : <AudioLines size={31} strokeWidth={1.5} />}</span><h2>{query || category !== 'All categories' ? 'No matching plugins' : view === 'installed' ? 'Your collection starts here' : view === 'updates' ? 'You’re up to date' : 'No plugins to show'}</h2><p>{query || category !== 'All categories' ? 'Try another search or choose a different category.' : view === 'installed' ? 'Choose a plugin from the library to install your first audio tool.' : view === 'updates' ? 'There are no newer releases for your installed plugins.' : 'Check for updates to load available releases.'}</p>{query || category !== 'All categories' ? <button className="button button-secondary" onClick={() => { setQuery(''); setCategory('All categories'); }}>Clear filters</button> : view === 'installed' ? <button className="button button-secondary" onClick={() => navigate('library')}>Browse library</button> : null}</div>
-                    : <div className="library-layout"><section className="plugin-list" aria-label="Plugin library"><div className="list-heading"><span>Plugin</span><span>Version</span></div>{visible.map(plugin => <PluginRow key={plugin.id} plugin={plugin} selected={plugin.id === selected?.id} busy={busy} onSelect={() => setSelectedId(plugin.id)} />)}<p className="library-footnote">Rescan plugins in your DAW after installing.</p></section>{selected && <PluginDetail key={selected.id} plugin={selected} state={state} busy={busy} progress={progress} openExternal={openExternal} install={(tag, formats) => operate(selected.id, 'Installing', () => manager.install({ id: selected.id, tag, formats }), `${selected.name} installed.`)} uninstall={formats => operate(selected.id, 'Removing', () => manager.uninstall({ id: selected.id, formats }), `${selected.name} removed.`)} />}</div>}
+                    : <div className="library-layout"><section className="plugin-list" aria-label="Plugin library"><div className="list-heading"><span>Plugin</span><span>Version</span></div>{visible.map(plugin => <PluginRow key={plugin.id} plugin={plugin} selected={plugin.id === selected?.id} busy={busy} onSelect={() => setSelectedId(plugin.id)} />)}<p className="library-footnote">Rescan plugins in your DAW after installing.</p></section>{selected && <PluginDetail key={selected.id} plugin={selected} state={state} busy={busy} progress={progress} openExternal={openExternal} install={(tag, formats, options) => operate(selected.id, 'Installing', () => manager.install({ id: selected.id, tag, formats, ...options }), `${selected.name} installed.`)} uninstall={(formats, options) => operate(selected.id, 'Removing', () => manager.uninstall({ id: selected.id, formats, ...options }), `${selected.name} removed.`)} move={(formats, options) => operate(selected.id, 'Moving', () => manager.move ? manager.move({ id: selected.id, formats, ...options }) : manager.install({ id: selected.id, tag: selected.releases[0]?.tag ?? '', formats, ...options }), `${selected.name} moved.`)} />}</div>}
                 </>}
             </>}
       {busy?.id === 'all' && <div className="batch-progress" role="status"><LoaderCircle className="spin" size={16} /><span>{progress?.message || 'Preparing updates…'}</span></div>}
@@ -214,24 +213,65 @@ function PluginRow({ plugin, selected, busy, onSelect }: { plugin: Plugin; selec
   </button>;
 }
 
-function PluginDetail({ plugin, state, busy, progress, openExternal, install, uninstall }: {
+function PluginDetail({ plugin, state, busy, progress, openExternal, install, uninstall, move }: {
   plugin: Plugin; state: ManagerState; busy: Busy; progress: Progress | null;
   openExternal: (url: string) => Promise<void>;
-  install: (tag: string, formats: PluginFormat[]) => Promise<boolean>;
-  uninstall: (formats: PluginFormat[]) => Promise<boolean>;
+  install: (tag: string, formats: PluginFormat[], options?: { overwrite?: boolean }) => Promise<boolean>;
+  uninstall: (formats: PluginFormat[], options?: { unmanaged?: boolean }) => Promise<boolean>;
+  move?: (formats: PluginFormat[], options?: { overwrite?: boolean }) => Promise<boolean>;
 }) {
   const [tag, setTag] = useState(plugin.releases[0]?.tag ?? '');
-  const [formats, setFormats] = useState<PluginFormat[]>(() => plugin.installed.filter(item => item.managed).map(item => item.format).length ? plugin.installed.filter(item => item.managed).map(item => item.format) : plugin.formats.includes('VST3') ? ['VST3'] : plugin.formats.slice(0, 1));
+  const [formats, setFormats] = useState<PluginFormat[]>(() => {
+    const detected = plugin.installed.map(item => item.format);
+    if (detected.length) return [...new Set(detected)];
+    return plugin.formats.includes('VST3') ? ['VST3'] : plugin.formats.slice(0, 1);
+  });
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const [confirmReplace, setConfirmReplace] = useState(false);
   const release = plugin.releases.find(item => item.tag === tag) ?? plugin.releases[0];
+
   const managed = plugin.installed.filter(item => item.managed);
   const unmanaged = plugin.installed.filter(item => !item.managed);
-  const sameVersion = formats.length > 0 && formats.every(format => plugin.installed.some(item => item.managed && item.format === format && formatVersion(item.version) === formatVersion(release?.tag ?? '')));
+
+  const currentFolderManaged = managed.filter(item => !item.locationMismatch);
+  const oldFolderManaged = managed.filter(item => Boolean(item.locationMismatch));
+
+  const hasUnmanaged = formats.some(format => unmanaged.some(item => item.format === format));
+  const hasOldLocation = formats.some(format => oldFolderManaged.some(item => item.format === format));
+  const sameVersion = formats.length > 0 && formats.every(format =>
+    currentFolderManaged.some(item => item.format === format && formatVersion(item.version || '') === formatVersion(release?.tag ?? ''))
+  );
+
   const available = isAvailable(release);
   const working = busy?.id === plugin.id || (busy?.id === 'all' && progress?.id === plugin.id);
   const percent = progress?.id === plugin.id && typeof progress.percent === 'number' ? Math.min(100, Math.max(0, progress.percent)) : undefined;
-  const action = sameVersion ? 'Installed' : managed.length && release?.tag === plugin.releases[0]?.tag && hasUpdate(plugin) ? 'Update plugin' : managed.length ? 'Install version' : 'Install plugin';
+
+  const action = hasUnmanaged
+    ? 'Replace with managed copy'
+    : managed.length && release?.tag === plugin.releases[0]?.tag && hasUpdate(plugin)
+      ? 'Update plugin'
+      : hasOldLocation
+        ? 'Move to new folder'
+        : sameVersion
+          ? 'Installed'
+          : managed.length
+            ? 'Install version'
+            : 'Install plugin';
+
   const toggleFormat = (format: PluginFormat) => setFormats(current => current.includes(format) ? current.filter(item => item !== format) : [...current, format]);
+
+  const handleInstallClick = () => {
+    if (!release) return;
+    if (hasOldLocation && move) {
+      void move(formats);
+      return;
+    }
+    if (hasUnmanaged) {
+      setConfirmReplace(true);
+      return;
+    }
+    void install(release.tag, formats);
+  };
 
   return <aside className="plugin-detail" aria-label={`${plugin.name} details`}>
     <div className="detail-heading"><PluginGlyph id={plugin.id} large /><span className="detail-category">{plugin.category}</span></div>
@@ -243,26 +283,58 @@ function PluginDetail({ plugin, state, busy, progress, openExternal, install, un
     <div className="version-label"><label htmlFor={`release-${plugin.id}`}>Release</label>{release?.publishedAt && <span>{new Date(release.publishedAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</span>}</div>
     <div className="release-select"><select id={`release-${plugin.id}`} value={release?.tag ?? ''} onChange={event => setTag(event.target.value)} disabled={!plugin.releases.length || Boolean(busy)}>{plugin.releases.length ? plugin.releases.map((item, index) => <option key={item.tag} value={item.tag}>Version {formatVersion(item.tag)}{index === 0 ? ' (latest)' : ''}</option>) : <option value="">No releases yet</option>}</select><ChevronDown size={15} /></div>
     <fieldset className="format-fieldset" disabled={Boolean(busy) || !available}><legend>Plugin formats</legend><div className="format-options">{plugin.formats.map(format => <label className={`format-option ${formats.includes(format) ? 'checked' : ''}`} key={format}><input type="checkbox" checked={formats.includes(format)} onChange={() => toggleFormat(format)} /><span className="checkbox-mark">{formats.includes(format) && <Check size={11} strokeWidth={2.4} />}</span><span>{format}</span></label>)}</div></fieldset>
-    {available ? <button className="button button-primary install-button" disabled={Boolean(busy) || formats.length === 0 || sameVersion || formats.some(format => unmanaged.some(item => item.format === format))} onClick={() => release && void install(release.tag, formats)}>{working ? <LoaderCircle size={16} className="spin" /> : sameVersion ? <Check size={16} /> : <Download size={16} />}{working ? busy?.action === 'Removing' ? 'Removing…' : 'Installing…' : action}</button> : <div className="source-availability"><p>{release ? `No ${platformName(state.platform)} download for this release.` : 'A packaged release is not available yet.'}</p><button className="button button-secondary" onClick={() => void openExternal(`${plugin.url}#readme`)}>Build from source<ArrowUpRight size={14} /></button></div>}
+    {available ? (
+      <div className="install-actions">
+        <button className="button button-primary install-button" disabled={Boolean(busy) || formats.length === 0 || sameVersion} onClick={handleInstallClick}>
+          {working ? <LoaderCircle size={16} className="spin" /> : sameVersion ? <Check size={16} /> : <Download size={16} />}
+          {working ? busy?.action === 'Removing' ? 'Removing…' : busy?.action === 'Moving' ? 'Moving…' : 'Installing…' : action}
+        </button>
+        {sameVersion && (
+          <button
+            className="button button-secondary reinstall-button"
+            disabled={Boolean(busy) || formats.length === 0}
+            onClick={() => release && void install(release.tag, formats, { overwrite: true })}
+            title="Reinstall this version"
+          >
+            <RefreshCw size={14} />Reinstall
+          </button>
+        )}
+      </div>
+    ) : (
+      <div className="source-availability">
+        <p>{release ? `No ${platformName(state.platform)} download for this release.` : 'A packaged release is not available yet.'}</p>
+        <button className="button button-secondary" onClick={() => void openExternal(`${plugin.url}#readme`)}>Build from source<ArrowUpRight size={14} /></button>
+      </div>
+    )}
     {working && <div className="install-progress" role="status"><div className={`progress-track ${percent === undefined ? 'indeterminate' : ''}`} role="progressbar" aria-label="Installation progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}><span style={percent === undefined ? undefined : { width: `${percent}%` }} /></div><p>{progress?.id === plugin.id ? progress.message : 'Preparing…'}</p></div>}
-    {unmanaged.length > 0 && <p className="unmanaged-note"><CircleAlert size={14} /><span>{unmanaged.map(item => item.format).join(', ')} found outside this manager. Move the existing plugin or choose another installation folder to install a managed copy.</span></p>}
-    {managed.length > 0 && <div className="installed-details"><div className="installed-details-heading"><Check size={13} /><span>On this computer</span><button className="icon-button remove-button" onClick={() => setConfirmRemove(true)} disabled={Boolean(busy)} aria-label={`Remove ${plugin.name}`} title="Remove plugin"><Trash2 size={14} /></button></div>{managed.map(item => <div className="installed-version" key={item.format} title={item.path}><span>{item.format}</span><span>{formatVersion(item.version)}</span></div>)}</div>}
+    {hasOldLocation && <p className="unmanaged-note"><CircleAlert size={14} /><span>Installed in a previous folder. Click "{action}" to move it to your current folder.</span></p>}
+    {unmanaged.length > 0 && <p className="unmanaged-note"><CircleAlert size={14} /><span>{unmanaged.map(item => item.format).join(', ')} found outside this manager. You can replace it with a managed copy or remove it.</span></p>}
+    {plugin.installed.length > 0 && <div className="installed-details"><div className="installed-details-heading"><Check size={13} /><span>On this computer</span><button className="icon-button remove-button" onClick={() => setConfirmRemove(true)} disabled={Boolean(busy)} aria-label={`Remove ${plugin.name}`} title="Remove plugin"><Trash2 size={14} /></button></div>{plugin.installed.map(item => <div className="installed-version" key={item.path} title={item.path}><span>{item.format}{!item.managed ? ' (outside manager)' : item.locationMismatch ? ' (previous folder)' : ''}</span><span>{item.version ? formatVersion(item.version) : 'installed'}</span></div>)}</div>}
     <div className="detail-links"><button onClick={() => void openExternal(plugin.url)}><Github size={14} /><span>View project</span><ArrowUpRight size={13} /></button>{release && <button onClick={() => void openExternal(release.url)}><ExternalLink size={14} /><span>Release notes</span><ArrowUpRight size={13} /></button>}</div>
-    {confirmRemove && <ConfirmDialog title={`Remove ${plugin.name}?`} description={`This removes the managed ${managed.map(item => item.format).join(' and ')} ${managed.length > 1 ? 'plugins' : 'plugin'} from your computer. You can install them again from the library.`} busy={Boolean(busy)} onCancel={() => setConfirmRemove(false)} onConfirm={async () => { if (await uninstall(managed.map(item => item.format))) setConfirmRemove(false); }} />}
+    {confirmRemove && <ConfirmDialog title={`Remove ${plugin.name}?`} description={`This removes ${plugin.name} (${plugin.installed.map(item => item.format).join(' and ')}) from your computer.`} cancelLabel="Keep plugin" actionLabel="Remove plugin" danger={true} busy={Boolean(busy)} onCancel={() => setConfirmRemove(false)} onConfirm={async () => { if (await uninstall(plugin.installed.map(item => item.format), { unmanaged: true })) setConfirmRemove(false); }} />}
+    {confirmReplace && <ConfirmDialog title={`Replace existing ${plugin.name}?`} description={`An unmanaged ${formats.join(', ')} plugin already exists in your installation folder. OpenVST Manager will replace it with version ${formatVersion(release?.tag ?? '')} and manage it.`} cancelLabel="Keep existing" actionLabel="Replace and install" danger={false} busy={Boolean(busy)} onCancel={() => setConfirmReplace(false)} onConfirm={async () => { if (release && await install(release.tag, formats, { overwrite: true })) setConfirmReplace(false); }} />}
   </aside>;
 }
 
-function ConfirmDialog({ title, description, busy, onCancel, onConfirm }: { title: string; description: string; busy: boolean; onCancel: () => void; onConfirm: () => Promise<void> }) {
+function ConfirmDialog({ title, description, busy, actionLabel = 'Remove plugin', cancelLabel = 'Keep plugin', danger = true, onCancel, onConfirm }: {
+  title: string; description: string; busy: boolean; actionLabel?: string; cancelLabel?: string; danger?: boolean; onCancel: () => void; onConfirm: () => Promise<void>;
+}) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = ref.current;
     dialog?.showModal();
     return () => dialog?.close();
   }, []);
-  return <dialog ref={ref} className="confirm-dialog" onCancel={event => { event.preventDefault(); if (!busy) onCancel(); }} onClick={event => { if (event.target === event.currentTarget && !busy) onCancel(); }} aria-labelledby="confirm-title" aria-describedby="confirm-description"><div className="dialog-content"><span className="dialog-icon"><Trash2 size={22} strokeWidth={1.5} /></span><h2 id="confirm-title">{title}</h2><p id="confirm-description">{description}</p><div className="dialog-actions"><button autoFocus className="button button-secondary" disabled={busy} onClick={onCancel}>Keep plugin</button><button className="button button-danger" disabled={busy} onClick={() => void onConfirm()}>{busy ? <LoaderCircle size={14} className="spin" /> : <Trash2 size={14} />}{busy ? 'Removing…' : 'Remove plugin'}</button></div></div></dialog>;
+  return <dialog ref={ref} className="confirm-dialog" onCancel={event => { event.preventDefault(); if (!busy) onCancel(); }} onClick={event => { if (event.target === event.currentTarget && !busy) onCancel(); }} aria-labelledby="confirm-title" aria-describedby="confirm-description"><div className="dialog-content"><span className="dialog-icon">{danger ? <Trash2 size={22} strokeWidth={1.5} /> : <Download size={22} strokeWidth={1.5} />}</span><h2 id="confirm-title">{title}</h2><p id="confirm-description">{description}</p><div className="dialog-actions"><button autoFocus className="button button-secondary" disabled={busy} onClick={onCancel}>{cancelLabel}</button><button className={`button ${danger ? 'button-danger' : 'button-primary'}`} disabled={busy} onClick={() => void onConfirm()}>{busy ? <LoaderCircle size={14} className="spin" /> : danger ? <Trash2 size={14} /> : <Download size={14} />}{busy ? 'Working…' : actionLabel}</button></div></div></dialog>;
 }
 
-function SettingsPanel({ state, manager, busy, save, onError, openExternal }: { state: ManagerState; manager: ManagerAPI; busy: Busy; save: (settings: Settings) => Promise<boolean>; onError: (message: string) => void; openExternal: (url: string) => Promise<void> }) {
+function SettingsPanel({ state, manager, busy, save, onError, openExternal, operate }: {
+  state: ManagerState; manager: ManagerAPI; busy: Busy;
+  save: (settings: Settings) => Promise<boolean>;
+  onError: (message: string) => void;
+  openExternal: (url: string) => Promise<void>;
+  operate: (id: string, action: string, operation: () => Promise<ManagerState>, success?: string) => Promise<boolean>;
+}) {
   const normalize = (p: string) => {
     const trimmed = (p || '').trim();
     if (state.platform === 'win32') return trimmed.replace(/[\\/]+/g, '\\').replace(/\\$/, '').toLowerCase();
@@ -292,6 +364,16 @@ function SettingsPanel({ state, manager, busy, save, onError, openExternal }: { 
   const [choosing, setChoosing] = useState(false);
   const changed = JSON.stringify(draft) !== JSON.stringify(state.settings);
   const formats: PluginFormat[] = state.platform === 'darwin' ? ['VST3', 'AU'] : ['VST3'];
+
+  const oldLocationCount = state.plugins.filter(plugin =>
+    plugin.installed.some(item => item.managed && item.locationMismatch)
+  ).length;
+
+  const handleMoveAll = async () => {
+    if (!manager.moveAll) return;
+    await operate('all', 'Moving plugins', () => manager.moveAll!(), 'Installed plugins moved to current folder.');
+  };
+
   const choose = async (format: PluginFormat) => {
     setChoosing(true);
     try { const path = await manager.chooseDirectory(format); if (path) setDraft(current => ({ ...current, paths: { ...current.paths, [format]: path } })); }
@@ -304,5 +386,5 @@ function SettingsPanel({ state, manager, busy, save, onError, openExternal }: { 
     const matchingOption = options.find(opt => normalize(opt.path) === normalize(currentPath));
     const selectValue = matchingOption ? matchingOption.path : '__custom__';
     return <div className="path-setting" key={format}><label htmlFor={`path-select-${format}`}>{format === 'AU' ? 'Audio Units' : 'VST3'}</label><div className="path-preset-select"><select id={`path-select-${format}`} aria-label={`${format === 'AU' ? 'Audio Units' : 'VST3'} location`} value={selectValue} onChange={event => { const next = event.target.value; if (next !== '__custom__') setDraft(current => ({ ...current, paths: { ...current.paths, [format]: next } })); }} disabled={Boolean(busy) || choosing}>{options.map(option => <option key={option.path} value={option.path}>{option.label} ({option.path})</option>)}<option value="__custom__">Custom folder…</option></select><ChevronDown size={14} /></div><div className="path-control"><Folder size={17} /><input id={`path-${format}`} aria-label={`${format === 'AU' ? 'Audio Units' : 'VST3'} path`} value={draft.paths[format]} onChange={event => setDraft(current => ({ ...current, paths: { ...current.paths, [format]: event.target.value } }))} spellCheck={false} autoComplete="off" disabled={Boolean(busy) || choosing} /><button className="button button-secondary" onClick={() => void choose(format)} disabled={Boolean(busy) || choosing}>Choose folder</button></div></div>;
-  })}{state.platform === 'win32' && <p className="settings-hint">Add your VST3 folder to your DAW’s plugin search paths, then rescan.</p>}</section><section className="settings-section release-settings"><div><h2>Prereleases</h2><p>Include early versions when checking for updates.</p></div><button type="button" role="switch" aria-checked={draft.includePrereleases} aria-label="Include prereleases" className={`switch ${draft.includePrereleases ? 'switch-on' : ''}`} disabled={Boolean(busy)} onClick={() => setDraft(current => ({ ...current, includePrereleases: !current.includePrereleases }))}><span /></button></section><div className="settings-actions"><span>{changed ? 'You have unsaved changes.' : 'Your preferences are saved on this computer.'}</span><button className="button button-primary" disabled={!changed || Boolean(busy) || choosing || formats.some(format => !draft.paths[format]?.trim())} onClick={() => void save(draft)}>{busy?.id === 'settings' ? <LoaderCircle size={15} className="spin" /> : <Check size={15} />}Save changes</button></div><div className="about-settings"><AudioLines size={21} strokeWidth={1.5} /><div><span>OpenVST Manager {state.appVersion}</span><p>{platformName(state.platform)} {state.arch}</p></div><button className="button button-quiet" onClick={() => void openExternal('https://github.com/alanmarcero/alan-m-OpenVSTManager/releases/latest')}>Manager releases<ArrowUpRight size={13} /></button></div></div>;
+  })}{oldLocationCount > 0 && <div className="migration-banner"><p>{oldLocationCount} installed {oldLocationCount === 1 ? 'plugin is' : 'plugins are'} in a previous folder.</p><button className="button button-secondary" disabled={Boolean(busy)} onClick={() => void handleMoveAll()}><Folder size={14} />Move all to current folder</button></div>}{state.platform === 'win32' && <p className="settings-hint">Add your VST3 folder to your DAW’s plugin search paths, then rescan.</p>}</section><section className="settings-section release-settings"><div><h2>Prereleases</h2><p>Include early versions when checking for updates.</p></div><button type="button" role="switch" aria-checked={draft.includePrereleases} aria-label="Include prereleases" className={`switch ${draft.includePrereleases ? 'switch-on' : ''}`} disabled={Boolean(busy)} onClick={() => setDraft(current => ({ ...current, includePrereleases: !current.includePrereleases }))}><span /></button></section><div className="settings-actions"><span>{changed ? 'You have unsaved changes.' : 'Your preferences are saved on this computer.'}</span><button className="button button-primary" disabled={!changed || Boolean(busy) || choosing || formats.some(format => !draft.paths[format]?.trim())} onClick={() => void save(draft)}>{busy?.id === 'settings' ? <LoaderCircle size={15} className="spin" /> : <Check size={15} />}Save changes</button></div><div className="about-settings"><AudioLines size={21} strokeWidth={1.5} /><div><span>OpenVST Manager {state.appVersion}</span><p>{platformName(state.platform)} {state.arch}</p></div><button className="button button-quiet" onClick={() => void openExternal('https://github.com/alanmarcero/alan-m-OpenVSTManager/releases/latest')}>Manager releases<ArrowUpRight size={13} /></button></div></div>;
 }
