@@ -64,4 +64,9 @@ test('service routes move, moveAll, and overwrite/unmanaged flags correctly', as
 
   await service.uninstall({ id: 'openMaster', formats: ['VST3'], unmanaged: true });
   assert.equal(uninstallOptions.unmanaged, true);
+
+  let uninstalledFormats = null;
+  service.installer.uninstall = async (opts) => { uninstalledFormats = opts.formats; return []; };
+  await service.uninstallAll();
+  assert.deepEqual(uninstalledFormats, ['VST3']);
 });
