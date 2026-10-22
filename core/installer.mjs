@@ -7,6 +7,35 @@ import { extractArchive } from './archive.mjs';
 
 const FORMATS = ['VST3', 'AU'];
 
+export function standardPathOptions({ platform = process.platform, home = homedir(), env = process.env } = {}) {
+  if (platform === 'win32') {
+    return {
+      VST3: [
+        { label: 'User folder', path: path.win32.join(env.LOCALAPPDATA || path.win32.join(home, 'AppData/Local'), 'Programs/Common/VST3') },
+        { label: 'Program Files', path: 'C:\\Program Files\\Common Files\\VST3' },
+      ],
+    };
+  }
+  if (platform === 'darwin') {
+    return {
+      VST3: [
+        { label: 'User folder (~/Library)', path: path.posix.join(home, 'Library/Audio/Plug-Ins/VST3') },
+        { label: 'System folder (/Library)', path: '/Library/Audio/Plug-Ins/VST3' },
+      ],
+      AU: [
+        { label: 'User folder (~/Library)', path: path.posix.join(home, 'Library/Audio/Plug-Ins/Components') },
+        { label: 'System folder (/Library)', path: '/Library/Audio/Plug-Ins/Components' },
+      ],
+    };
+  }
+  return {
+    VST3: [
+      { label: 'User folder (~/.vst3)', path: path.posix.join(home, '.vst3') },
+      { label: 'System folder (/usr/lib/vst3)', path: '/usr/lib/vst3' },
+    ],
+  };
+}
+
 export function defaultPaths({ platform = process.platform, home = homedir(), env = process.env } = {}) {
   if (platform === 'darwin') return { VST3: path.posix.join(home, 'Library/Audio/Plug-Ins/VST3'), AU: path.posix.join(home, 'Library/Audio/Plug-Ins/Components') };
   if (platform === 'win32') return { VST3: path.win32.join(env.LOCALAPPDATA || path.win32.join(home, 'AppData/Local'), 'Programs/Common/VST3') };

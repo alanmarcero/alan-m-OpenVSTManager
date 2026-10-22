@@ -192,6 +192,10 @@ svg { flex-shrink: 0; }
 .settings-section > p, .release-settings p { font-size: 12px; line-height: 1.8; color: #8b979f; margin: 0 0 29px; }
 .path-setting { margin-top: 23px; }
 .path-setting > label { display: block; font-size: 12px; margin-bottom: 10px; color: #6c7d88; }
+.path-preset-select { position: relative; margin-bottom: 9px; }
+.path-preset-select select { width: 100%; padding: 8px 33px 8px 12px; appearance: none; background: #edf1f3; border: 1px solid #dce4e8; border-radius: 6px; color: #51636e; font-size: 12px; cursor: pointer; height: 35px; }
+.path-preset-select > svg { position: absolute; pointer-events: none; right: 11px; top: 11px; color: #8a9aa3; }
+.path-preset-select select:disabled { opacity: .6; cursor: default; }
 .path-control { display: flex; align-items: center; background: #edf1f3; border: 1px solid #dce4e8; padding: 5px 5px 5px 13px; border-radius: 6px; gap: 11px; }
 .path-control > svg { color: #96a4ac; }
 .path-control input { flex: 1; width: 100%; border: 0; color: #6e808b; font-size: 12px; background: transparent; padding: 9px 0; }
@@ -252,7 +256,7 @@ svg { flex-shrink: 0; }
 :is([data-theme="dark"], [data-theme="cyberpunk"]) .plugin-row { border-top-color: transparent; }
 :is([data-theme="dark"], [data-theme="cyberpunk"]) .plugin-row:hover { background: var(--theme-panel); }
 :is([data-theme="dark"], [data-theme="cyberpunk"]) .plugin-row.selected { background: var(--theme-selection); border-color: var(--theme-border); }
-:is([data-theme="dark"], [data-theme="cyberpunk"]) :is(.release-select select, .button-secondary, .button-quiet) { background: var(--theme-field); border-color: var(--theme-border); color: var(--theme-copy); }
+:is([data-theme="dark"], [data-theme="cyberpunk"]) :is(.release-select select, .path-preset-select select, .button-secondary, .button-quiet) { background: var(--theme-field); border-color: var(--theme-border); color: var(--theme-copy); }
 :is([data-theme="dark"], [data-theme="cyberpunk"]) :is(.button-secondary, .button-quiet):hover:not(:disabled) { background: var(--theme-selection); }
 :is([data-theme="dark"], [data-theme="cyberpunk"]) .button-primary { background: #548f98; border-color: #548f98; color: #fff; }
 :is([data-theme="dark"], [data-theme="cyberpunk"]) .button-primary:hover:not(:disabled) { background: #659fa8; border-color: #659fa8; }

@@ -40,10 +40,10 @@ xattr -dr com.apple.quarantine '/Applications/OpenVST Manager.app'
 | System | VST3 default | Audio Units |
 | --- | --- | --- |
 | macOS | `~/Library/Audio/Plug-Ins/VST3` | `~/Library/Audio/Plug-Ins/Components` |
-| Windows | `%LOCALAPPDATA%/Programs/Common/VST3` | Not supported |
+| Windows | `%LOCALAPPDATA%/Programs/Common/VST3` (default) or `C:\Program Files\Common Files\VST3` | Not supported |
 | Linux | `~/.vst3` | Not supported |
 
-Windows uses a writable user folder. Add that folder to your DAW's VST3 search paths, or choose a writable folder your DAW already scans. Close your DAW before replacing plugins and rescan afterward. The manager does not elevate privileges. Some older DAWs require a system-wide VST3 location; use your DAW's supported installation method if its folders require administrator access.
+Settings allows choosing between standard installation folder options (including the default user folder and `C:\Program Files\Common Files\VST3` on Windows) or specifying a custom directory. Add that folder to your DAW's VST3 search paths, or choose a writable folder your DAW already scans. Close your DAW before replacing plugins and rescan afterward. The manager does not elevate privileges. Some older DAWs require a system-wide VST3 location; use your DAW's supported installation method if its folders require administrator access.
 
 Existing external plugins are shown with an unknown version and are not overwritten or removed. Move an external copy yourself before installing a managed copy. When changing the installation folder, old managed files remain tracked and are moved on the next installation/update. Removal uses receipts and file ownership checks, never broad folder deletion.
 
