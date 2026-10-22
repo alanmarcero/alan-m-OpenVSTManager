@@ -276,7 +276,8 @@ export class Installer {
           validateRecord(record, plugin, format);
           if (await exists(record.path)) {
             const managed = await ownsRecord(record);
-            installed.push({ format, version: managed ? record.version : null, path: record.path, managed });
+            const locationMismatch = Boolean(managed && this.paths[format] && path.resolve(record.root) !== path.resolve(this.paths[format]));
+            installed.push({ format, version: managed ? record.version : null, path: record.path, managed, ...(locationMismatch ? { locationMismatch: true } : {}) });
             seen.add(record.path);
           }
         } catch { /* Invalid records never grant ownership. */ }
@@ -300,7 +301,7 @@ export class Installer {
     return result;
   }
 
-  install({ plugin, tag, archivePath, formats, digest }) {
+  install({ plugin, tag, archivePath, formats, digest, overwrite = false }) {
     return this.#serialize(async () => {
       this.#formats(plugin, formats);
       await this.#ensureRecovery(plugin);
@@ -312,6 +313,7 @@ export class Installer {
       try {
         await extractArchive(archivePath, stage);
         const changes = [];
+        const extraCleanups = [];
         for (const format of formats) {
           const candidates = await findBundles(stage, bundleNames(plugin, format));
           if (candidates.length !== 1) throw new Error(candidates.length ? `Multiple matching ${format} bundles in the archive` : `Archive is missing the expected ${format} bundle`);
@@ -324,28 +326,159 @@ export class Installer {
             validateRecord(previous, plugin, format);
             if (await exists(previous.path) && !await ownsRecord(previous)) throw new Error(`Installation ownership changed externally: ${previous.path}`);
           }
-          if (await exists(target) && (!previous || previous.path !== target || !await ownsRecord(previous))) throw new Error(`An unmanaged plugin already exists at ${target}. Move it before installing with OpenVST Manager.`);
-          changes.push({ key, format, source, target, root, bundleName, previous });
+          let changePrevious = previous;
+          const targetInfo = await exists(target);
+          if (targetInfo) {
+            const isOwnedPrevious = previous && previous.path === target && await ownsRecord(previous);
+            if (!isOwnedPrevious) {
+              if (!overwrite) throw new Error(`An unmanaged plugin already exists at ${target}. Move it before installing with OpenVST Manager.`);
+              changePrevious = {
+                pluginId: plugin.id,
+                format,
+                bundleName,
+                path: target,
+                root,
+                version: 'existing',
+                identity: identity(targetInfo),
+              };
+              if (previous && previous.path !== target && await exists(previous.path)) {
+                extraCleanups.push(previous.path);
+              }
+            }
+          }
+          changes.push({ key, format, source, target, root, bundleName, previous: changePrevious });
         }
         await this.#transaction(receipts, changes, tag);
+        for (const oldPath of extraCleanups) {
+          await fs.rm(oldPath, { recursive: true, force: true }).catch(() => {});
+        }
       } finally { await fs.rm(stage, { recursive: true, force: true }).catch(() => {}); }
       return this.#detect(plugin);
     });
   }
 
-  uninstall({ plugin, formats }) {
+  move({ plugin, formats, overwrite = false }) {
+    return this.#serialize(async () => {
+      this.#formats(plugin, formats);
+      await this.#ensureRecovery(plugin);
+      const receipts = await this.#loadReceipts();
+      const changes = [];
+      const extraCleanups = [];
+      for (const format of formats) {
+        const key = `${plugin.id}:${format}`;
+        const previous = receipts.installs[key];
+        await fs.mkdir(this.paths[format], { recursive: true });
+        const root = await fs.realpath(this.paths[format]);
+        const bundleName = previous?.bundleName || bundleNames(plugin, format)[0];
+        const target = path.join(root, bundleName);
+
+        if (previous && previous.path === target && await exists(target)) {
+          continue;
+        }
+
+        if (previous && await exists(previous.path) && await ownsRecord(previous)) {
+          let changePrevious = previous;
+          const targetInfo = await exists(target);
+          if (targetInfo) {
+            if (!overwrite) throw new Error(`An unmanaged plugin already exists at ${target}. Move it before moving with OpenVST Manager.`);
+            changePrevious = {
+              pluginId: plugin.id,
+              format,
+              bundleName,
+              path: target,
+              root,
+              version: 'existing',
+              identity: identity(targetInfo),
+            };
+            extraCleanups.push(previous.path);
+          }
+          changes.push({
+            key,
+            format,
+            source: previous.path,
+            target,
+            root,
+            bundleName,
+            previous: changePrevious,
+            version: previous.version,
+          });
+        } else {
+          const targetInfo = await exists(target);
+          if (targetInfo && previous) {
+            receipts.installs[key] = {
+              pluginId: plugin.id,
+              format,
+              bundleName,
+              path: target,
+              root,
+              version: previous.version,
+              identity: identity(targetInfo),
+            };
+          } else {
+            throw new Error(`Cannot move ${plugin.id} ${format}: installation not found at ${previous?.path || 'source'}`);
+          }
+        }
+      }
+      if (changes.length) {
+        await this.#transaction(receipts, changes, changes[0]?.version || 'moved');
+        for (const oldPath of extraCleanups) {
+          await fs.rm(oldPath, { recursive: true, force: true }).catch(() => {});
+        }
+      } else {
+        await this.#writeState('receipts.json', receipts);
+      }
+      return this.#detect(plugin);
+    });
+  }
+
+  uninstall({ plugin, formats, unmanaged = false }) {
     return this.#serialize(async () => {
       this.#formats(plugin, formats);
       await this.#ensureRecovery(plugin);
       const receipts = await this.#loadReceipts(), changes = [];
+      const extraCleanups = [];
       for (const format of formats) {
         const key = `${plugin.id}:${format}`, previous = receipts.installs[key];
-        if (!previous) continue;
-        validateRecord(previous, plugin, format);
-        if (await exists(previous.path) && !await ownsRecord(previous)) throw new Error(`Installation ownership or path changed externally: ${previous.path}`);
-        changes.push({ key, previous });
+        let changePrevious = null;
+        if (previous) {
+          validateRecord(previous, plugin, format);
+          if (await exists(previous.path) && !await ownsRecord(previous)) throw new Error(`Installation ownership or path changed externally: ${previous.path}`);
+          changePrevious = previous;
+        }
+        if (unmanaged && this.paths[format]) {
+          const root = await fs.realpath(this.paths[format]).catch(() => null);
+          if (root) {
+            for (const name of bundleNames(plugin, format)) {
+              const filename = path.join(root, name);
+              const info = await exists(filename);
+              if (info) {
+                if (!changePrevious || changePrevious.path !== filename) {
+                  if (!changePrevious) {
+                    changePrevious = {
+                      pluginId: plugin.id,
+                      format,
+                      bundleName: name,
+                      path: filename,
+                      root,
+                      version: 'unmanaged',
+                      identity: identity(info),
+                    };
+                  } else {
+                    extraCleanups.push(filename);
+                  }
+                }
+              }
+            }
+          }
+        }
+        if (changePrevious) {
+          changes.push({ key, previous: changePrevious });
+        }
       }
       if (changes.length) await this.#transaction(receipts, changes);
+      for (const extra of extraCleanups) {
+        await fs.rm(extra, { recursive: true, force: true }).catch(() => {});
+      }
       return this.#detect(plugin);
     });
   }
@@ -365,7 +498,7 @@ export class Installer {
         if (change.source) {
           entry.prepared = path.join(await directory(change.root, '.openvstmanager-'), change.bundleName);
           await fs.cp(change.source, entry.prepared, { recursive: true, force: false, errorOnExist: true });
-          entry.next = { pluginId: change.key.slice(0, change.key.lastIndexOf(':')), format: change.format, bundleName: change.bundleName, path: change.target, root: change.root, version, identity: identity(await fs.lstat(entry.prepared, { bigint: true })) };
+          entry.next = { pluginId: change.key.slice(0, change.key.lastIndexOf(':')), format: change.format, bundleName: change.bundleName, path: change.target, root: change.root, version: change.version || version, identity: identity(await fs.lstat(entry.prepared, { bigint: true })) };
           next.installs[change.key] = entry.next;
         } else delete next.installs[change.key];
         if (change.previous && await exists(change.previous.path)) {

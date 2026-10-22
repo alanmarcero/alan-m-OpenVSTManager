@@ -20,9 +20,10 @@ export interface PluginRelease {
 
 export interface InstalledPlugin {
   format: PluginFormat;
-  version: string;
+  version: string | null;
   path: string;
   managed: boolean;
+  locationMismatch?: boolean;
 }
 
 export interface Plugin {
@@ -72,8 +73,10 @@ export interface Progress {
 export interface ManagerAPI {
   getState(): Promise<ManagerState>;
   refresh(): Promise<ManagerState>;
-  install(options: { id: string; tag: string; formats: PluginFormat[] }): Promise<ManagerState>;
-  uninstall(options: { id: string; formats: PluginFormat[] }): Promise<ManagerState>;
+  install(options: { id: string; tag: string; formats: PluginFormat[]; overwrite?: boolean }): Promise<ManagerState>;
+  uninstall(options: { id: string; formats: PluginFormat[]; unmanaged?: boolean }): Promise<ManagerState>;
+  move?(options: { id: string; formats: PluginFormat[]; overwrite?: boolean }): Promise<ManagerState>;
+  moveAll?(): Promise<ManagerState>;
   saveSettings(settings: { includePrereleases?: boolean; paths?: Partial<Record<PluginFormat, string>> }): Promise<ManagerState>;
   chooseDirectory(format: PluginFormat): Promise<string | null>;
   openExternal(url: string): Promise<void>;

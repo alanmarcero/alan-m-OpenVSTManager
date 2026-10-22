@@ -4,6 +4,8 @@ contextBridge.exposeInMainWorld('manager',{
   refresh:()=>ipcRenderer.invoke('manager:refresh'),
   install:request=>ipcRenderer.invoke('manager:install',request),
   uninstall:request=>ipcRenderer.invoke('manager:uninstall',request),
+  move:request=>ipcRenderer.invoke('manager:move',request),
+  moveAll:()=>ipcRenderer.invoke('manager:moveAll'),
   saveSettings:settings=>ipcRenderer.invoke('manager:saveSettings',settings),
   chooseDirectory:format=>ipcRenderer.invoke('manager:chooseDirectory',format),
   openExternal:url=>ipcRenderer.invoke('manager:openExternal',url),
