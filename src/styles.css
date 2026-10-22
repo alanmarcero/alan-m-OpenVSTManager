@@ -65,8 +65,8 @@ svg { flex-shrink: 0; }
 .button-quiet { border-color: #d8e0e4; background: #f4f6f7e8; color: #53636d; }
 .button-quiet:hover:not(:disabled) { background: #e8edef; border-color: #c7d3d8; }
 .button-quiet:disabled { opacity: .5; }
-.button-danger { color: #fff; background: #a04d4d; }
-.button-danger:hover:not(:disabled) { background: #894141; }
+.button-danger { color: #fff; background: #a04d4d; border-color: #a04d4d; }
+.button-danger:hover:not(:disabled) { background: #894141; border-color: #894141; }
 .button-danger:disabled { opacity: .6; }
 .last-checked { font-size: 11px; color: #8a969e; padding-right: 1px; }
 .connection-notice { display: flex; align-items: flex-start; gap: 10px; color: #776847; background: #f1eee5; border-radius: 5px; padding: 12px 15px; margin: -8px 0 23px; font-size: 12px; line-height: 1.6; }
@@ -84,7 +84,8 @@ svg { flex-shrink: 0; }
 .category-select { display: flex; align-items: center; gap: 9px; color: #7d8a92; position: relative; height: 37px; }
 .category-select select { appearance: none; background: transparent; border: 0; padding: 8px 21px 8px 0; color: #66757f; font-size: 12px; cursor: pointer; max-width: 160px; }
 .category-select > svg:last-child { position: absolute; right: 0; pointer-events: none; }
-.result-count { margin-left: auto; font-size: 11px; color: #87949c; }
+.toolbar-actions { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+.result-count { font-size: 11px; color: #87949c; }
 .update-all { margin-left: auto; }
 .library-layout { display: grid; grid-template-columns: minmax(310px, 1fr) 310px; align-items: start; gap: 31px; padding-top: 26px; }
 .plugin-list { min-width: 0; }
@@ -267,6 +268,8 @@ svg { flex-shrink: 0; }
 :is([data-theme="dark"], [data-theme="cyberpunk"]) .button-primary { background: #548f98; border-color: #548f98; color: #fff; }
 :is([data-theme="dark"], [data-theme="cyberpunk"]) .button-primary:hover:not(:disabled) { background: #659fa8; border-color: #659fa8; }
 :is([data-theme="dark"], [data-theme="cyberpunk"]) .button-primary:disabled { opacity: .6; }
+:is([data-theme="dark"], [data-theme="cyberpunk"]) .button-danger { background: #8e3e3e; border-color: #8e3e3e; color: #fff; }
+:is([data-theme="dark"], [data-theme="cyberpunk"]) .button-danger:hover:not(:disabled) { background: #a34848; border-color: #a34848; }
 :is([data-theme="dark"], [data-theme="cyberpunk"]) .theme-toggle button { color: var(--theme-secondary); }
 :is([data-theme="dark"], [data-theme="cyberpunk"]) .theme-toggle button:hover { background: var(--theme-selection); }
 :is([data-theme="dark"], [data-theme="cyberpunk"]) .theme-toggle button[aria-pressed="true"] { background: #385463; color: #e7f5fa; }

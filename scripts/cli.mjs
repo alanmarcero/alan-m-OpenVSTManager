@@ -11,7 +11,7 @@ const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const {values,positionals}=parseArgs({allowPositionals:true,options:{format:{type:'string',default:'VST3'},version:{type:'string'},'data-dir':{type:'string'},help:{type:'boolean'}}});
 const [command='list',id,folder]=positionals;
 if(values.help){
-  console.log('OpenVST Manager\n\nlist\ninstall <plugin> [--version <tag>] [--format VST3|AU]\nuninstall <plugin> [--format VST3|AU]\npaths [VST3|AU <folder>]\n\n--data-dir <folder> uses an isolated settings/receipt directory.');
+  console.log('OpenVST Manager\n\nlist\ninstall <plugin> [--version <tag>] [--format VST3|AU]\nuninstall <plugin> [--format VST3|AU]\nuninstall-all\npaths [VST3|AU <folder>]\n\n--data-dir <folder> uses an isolated settings/receipt directory.');
   process.exit(0);
 }
 const config=process.platform==='darwin'?path.join(homedir(),'Library','Application Support'):process.platform==='win32'?(process.env.APPDATA||path.join(homedir(),'AppData','Roaming')):(process.env.XDG_CONFIG_HOME||path.join(homedir(),'.config'));
@@ -34,5 +34,6 @@ try{
     if(!plugin)throw new Error('Unknown plugin. Run list to see plugin IDs.');
     await manager.install({id,tag:values.version||plugin.releases[0]?.tag,formats:[values.format]});
   }else if(command==='uninstall')await manager.uninstall({id,formats:[values.format]});
+  else if(command==='uninstall-all')await manager.uninstallAll();
   else throw new Error('Unknown command. Use --help.');
 }catch(error){console.error(error.message);process.exitCode=1;}

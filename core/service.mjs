@@ -145,4 +145,23 @@ export class ManagerService {
       await this.installer.uninstall({plugin,formats:request.formats,unmanaged:Boolean(request.unmanaged)});
     });
   }
+  async uninstallAll(options = {}){
+    await this.getState();
+    const plugins = this.catalog;
+    return this.operate('all', async () => {
+      this.progress('all', 'removing', 'Removing all installed plugins', 0);
+      for (const [index, plugin] of plugins.entries()) {
+        const installed = await this.installer.detect(plugin);
+        const formats = installed.map(item => item.format);
+        if (formats.length) {
+          await this.installer.uninstall({
+            plugin,
+            formats,
+            unmanaged: Boolean(options.unmanaged ?? true),
+          }).catch(() => {});
+        }
+        this.progress('all', 'removing', 'Removing all installed plugins', Math.round(((index + 1) / plugins.length) * 100));
+      }
+    });
+  }
 }

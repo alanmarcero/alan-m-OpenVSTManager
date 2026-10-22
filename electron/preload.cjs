@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld('manager',{
   refresh:()=>ipcRenderer.invoke('manager:refresh'),
   install:request=>ipcRenderer.invoke('manager:install',request),
   uninstall:request=>ipcRenderer.invoke('manager:uninstall',request),
+  uninstallAll:options=>ipcRenderer.invoke('manager:uninstallAll',options),
   move:request=>ipcRenderer.invoke('manager:move',request),
   moveAll:()=>ipcRenderer.invoke('manager:moveAll'),
   saveSettings:settings=>ipcRenderer.invoke('manager:saveSettings',settings),

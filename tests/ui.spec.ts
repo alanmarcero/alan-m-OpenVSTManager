@@ -189,3 +189,17 @@ test('update all promotes prereleases to stable without downgrading a newer form
   ]);
   expect(await page.evaluate(() => window.__managerTest.state.plugins.find(plugin => plugin.id === 'openEDMFilter')!.installed.find(item => item.format === 'AU')!.version)).toBe('v2.0.0-beta');
 });
+
+test('can uninstall all installed plugins with confirmation', async ({ page }) => {
+  await page.getByRole('button', { name: 'Installed plugins', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Uninstall all', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Uninstall all', exact: true }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(page.getByText('This removes all 1 installed plugin from your computer.')).toBeVisible();
+  await page.getByRole('dialog').getByRole('button', { name: 'Uninstall all', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Your collection starts here' })).toBeVisible();
+  expect(await page.evaluate(() => window.__managerTest.calls.filter(c => c.kind === 'uninstall'))).toEqual([
+    { kind: 'uninstall', id: 'openEDMFilter', formats: ['VST3'], unmanaged: true },
+  ]);
+});
