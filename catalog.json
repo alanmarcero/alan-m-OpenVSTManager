@@ -1,5 +1,16 @@
 [
   {
+    "id": "openWallLimiter",
+    "repo": "openWallLimiter",
+    "name": "openWallLimiter",
+    "description": "Five limiter characters, selectable high/low-pass filters, true-peak protection and loudness metering. Hold the line on your final mix.",
+    "category": "Mastering",
+    "bundleNames": {
+      "VST3": "openWallLimiter.vst3",
+      "AU": "openWallLimiter.component"
+    }
+  },
+  {
     "id": "openGlitchFX",
     "repo": "openGlitchFX",
     "name": "openGlitchFX",
