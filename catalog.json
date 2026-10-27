@@ -68,7 +68,7 @@
     "id": "openMaster",
     "repo": "openMaster",
     "name": "openMaster",
-    "description": "Precise low and high cuts with focused control over the low-end stereo field. A considered final touch.",
+    "description": "Studio 84 mastering rack with filters, tone EQ, stereo shaping, compression, dynamic EQ, saturation, clipping, limiting, and loudness meters.",
     "category": "Mastering",
     "bundleNames": {
       "VST3": [
