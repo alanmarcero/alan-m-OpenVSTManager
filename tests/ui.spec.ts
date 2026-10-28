@@ -137,6 +137,7 @@ test('can select installation folder from options and save', async ({ page }) =>
 });
 
 test('successful install and confirmed removal still complete with stale metadata', async ({ page }) => {
+  await page.getByRole('button', { name: /openGlitchFX Creative/ }).click();
   await page.evaluate(() => {
     window.__managerTest.state.error = 'Using saved catalog metadata.';
     window.__managerTest.state.offline = true;
@@ -155,6 +156,7 @@ test('successful install and confirmed removal still complete with stale metadat
 });
 
 test('a failed installation remains uninstalled and can be retried', async ({ page }) => {
+  await page.getByRole('button', { name: /openGlitchFX Creative/ }).click();
   await page.evaluate(() => { window.__managerTest.failInstall = true; });
   await page.getByRole('button', { name: 'Install plugin', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Download interrupted. Try again.');
