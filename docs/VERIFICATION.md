@@ -14,7 +14,7 @@ Verification for the initial 0.1.0 release, performed on 2026-10-21.
 
 ## GitHub build verification
 
-[Run 39611453549](https://github.com/alanmarcero/alan-m-OpenVSTManager/actions/runs/39611453549) passed for source commit `f35664a7b7bcaa21b2fff58fb05e06b84132f379`:
+[Run 39611453549](https://github.com/alanmarcero/alan-m-OpenVSTManager/actions/runs/39611453549) passed for source commit `5691af80fdbd0ffd0161599ac24a4db2f165670c`:
 
 - Ubuntu: 63 core tests, TypeScript/frontend build, and 9 browser tests.
 - Windows x64: 63 core tests, NSIS EXE packaging, and packaged-app launch with seven plugins and persistent Cyberpunk theme.

@@ -4,13 +4,13 @@ Initial audit: 2026-10-21 13:48 UTC. The original seven public releases and 15 Z
 
 | Repository / release | Exact source | Validation run | Project license |
 | --- | --- | --- | --- |
-| [openGlitchFX v1.0.0](https://github.com/alanmarcero/openGlitchFX/releases/tag/v1.0.0) | [8934bd2](https://github.com/alanmarcero/openGlitchFX/tree/8934bd2cd69eae12f5db1c61045d5ec60867d6cd) | [Passed](https://github.com/alanmarcero/openGlitchFX/actions/runs/39607551644) | MIT |
-| [openEDMFilter v0.1.0](https://github.com/alanmarcero/openEDMFilter/releases/tag/v0.1.0) | [dacfbaf](https://github.com/alanmarcero/openEDMFilter/tree/dacfbafe2fea72887179601cf653e56b42520936) | [Passed](https://github.com/alanmarcero/openEDMFilter/actions/runs/39607561635) | MIT |
-| [openSausage v1.0.0](https://github.com/alanmarcero/openSausage/releases/tag/v1.0.0) | [84f5834](https://github.com/alanmarcero/openSausage/tree/84f5834a00ee58a4d92aab7b874173f9dd4c009c) | [Passed](https://github.com/alanmarcero/openSausage/actions/runs/39607570914) | AGPL-3.0 |
-| [openTunerEQ v1.0.0](https://github.com/alanmarcero/openTunerEQ/releases/tag/v1.0.0) | [326266e](https://github.com/alanmarcero/openTunerEQ/tree/326266e1e486b353f1e488cf75fcca579d8f05cb) | [Passed](https://github.com/alanmarcero/openTunerEQ/actions/runs/39607588737) | AGPL-3.0 |
-| [openMaster v1.0.1](https://github.com/alanmarcero/openMaster/releases/tag/v1.0.1) | [35ce5ed](https://github.com/alanmarcero/openMaster/tree/35ce5ed9bd3fe223b2e82e9a8dac82b5ba158bf7) | [Passed](https://github.com/alanmarcero/openMaster/actions/runs/39607641103) | MIT |
-| [winamp-classic-equalizer-vst v1.0.0](https://github.com/alanmarcero/winamp-classic-equalizer-vst/releases/tag/v1.0.0) | [0c3d34b](https://github.com/alanmarcero/winamp-classic-equalizer-vst/tree/0c3d34bebffb415b1f7547af525ea83a8f5af667) | [Passed](https://github.com/alanmarcero/winamp-classic-equalizer-vst/actions/runs/39607605155) | No project LICENSE file |
-| [winamp-classic-visualizer-vst v1.0.0](https://github.com/alanmarcero/winamp-classic-visualizer-vst/releases/tag/v1.0.0) | [50da2f9](https://github.com/alanmarcero/winamp-classic-visualizer-vst/tree/50da2f948ceac7268c2baa1ca7f0ad56a76d7015) | [Passed](https://github.com/alanmarcero/winamp-classic-visualizer-vst/actions/runs/39607614204) | No project LICENSE file |
+| [openGlitchFX v1.0.0](https://github.com/alanmarcero/openGlitchFX/releases/tag/v1.0.0) | [8934bd2](https://github.com/alanmarcero/openGlitchFX/tree/0fd17d1ff4e874ea0ff13b82689a138a8d373a33) | [Passed](https://github.com/alanmarcero/openGlitchFX/actions/runs/39607551644) | MIT |
+| [openEDMFilter v0.1.0](https://github.com/alanmarcero/openEDMFilter/releases/tag/v0.1.0) | [dacfbaf](https://github.com/alanmarcero/openEDMFilter/tree/7a0133a0e25195f72116b40ad86878c780ff87c8) | [Passed](https://github.com/alanmarcero/openEDMFilter/actions/runs/39607561635) | MIT |
+| [openSausage v1.0.0](https://github.com/alanmarcero/openSausage/releases/tag/v1.0.0) | [84f5834](https://github.com/alanmarcero/openSausage/tree/a3d51307ba3bbf14dfec2762586b269f3af99174) | [Passed](https://github.com/alanmarcero/openSausage/actions/runs/39607570914) | AGPL-3.0 |
+| [openTunerEQ v1.0.0](https://github.com/alanmarcero/openTunerEQ/releases/tag/v1.0.0) | [326266e](https://github.com/alanmarcero/openTunerEQ/tree/459528906a6f90d6c66d672fa41c8773b0e91b52) | [Passed](https://github.com/alanmarcero/openTunerEQ/actions/runs/39607588737) | AGPL-3.0 |
+| [openMaster v1.0.1](https://github.com/alanmarcero/openMaster/releases/tag/v1.0.1) | [35ce5ed](https://github.com/alanmarcero/openMaster/tree/06ec55d26a4be891ca9b133241a0afbabc8dcbca) | [Passed](https://github.com/alanmarcero/openMaster/actions/runs/39607641103) | MIT |
+| [winamp-classic-equalizer-vst v1.0.0](https://github.com/alanmarcero/winamp-classic-equalizer-vst/releases/tag/v1.0.0) | [0c3d34b](https://github.com/alanmarcero/winamp-classic-equalizer-vst/tree/fa756bfab15c3a5dcb8d0be27aac95c7f43c50d0) | [Passed](https://github.com/alanmarcero/winamp-classic-equalizer-vst/actions/runs/39607605155) | No project LICENSE file |
+| [winamp-classic-visualizer-vst v1.0.0](https://github.com/alanmarcero/winamp-classic-visualizer-vst/releases/tag/v1.0.0) | [50da2f9](https://github.com/alanmarcero/winamp-classic-visualizer-vst/tree/fb010601aaf51dfac4024458820176d68369d8db) | [Passed](https://github.com/alanmarcero/winamp-classic-visualizer-vst/actions/runs/39607614204) | No project LICENSE file |
 
 ## Downloaded assets
 
@@ -52,7 +52,7 @@ No build or download blockers remain. The Winamp source-license omission remains
 
 ## openDucker addition — 2026-10-21
 
-[openDucker v1.0.0](https://github.com/alanmarcero/openDucker/releases/tag/v1.0.0) was built from [a0e9869](https://github.com/alanmarcero/openDucker/tree/a0e9869ddd6bb3a641f080057878bcc1e077cf93). [CI passed](https://github.com/alanmarcero/openDucker/actions/runs/39624213765): Linux address/undefined sanitizers, macOS universal and Windows x64 builds, native controls/state/audio tests, and pluginval level 5 on both platforms. Project license: AGPL-3.0.
+[openDucker v1.0.0](https://github.com/alanmarcero/openDucker/releases/tag/v1.0.0) was built from [a0e9869](https://github.com/alanmarcero/openDucker/tree/148753544dbe0c81931679c1eb72d12d339f0ef5). [CI passed](https://github.com/alanmarcero/openDucker/actions/runs/39624213765): Linux address/undefined sanitizers, macOS universal and Windows x64 builds, native controls/state/audio tests, and pluginval level 5 on both platforms. Project license: AGPL-3.0.
 
 | Asset | Architecture | SHA-256 |
 | --- | --- | --- |
@@ -65,18 +65,18 @@ Catalog integration passed 63 core tests, TypeScript/production build, and nine 
 
 ## openEDMDelay addition — 2026-10-28 UTC
 
-[openEDMDelay v0.1.1](https://github.com/alanmarcero/openEDMDelay/releases/tag/v0.1.1) was built from [d1aed020edcc450d51b97df654a4481c869fa516](https://github.com/alanmarcero/openEDMDelay/tree/d1aed020edcc450d51b97df654a4481c869fa516). [Release CI passed](https://github.com/alanmarcero/openEDMDelay/actions/runs/40607995234): macOS universal, Windows x64 and Linux x64 native jobs, sanitizers, and release publication.
+[openEDMDelay v0.1.1](https://github.com/alanmarcero/openEDMDelay/releases/tag/v0.1.1) was built from [89316aa92ee1a7e7f89aaa771d36276f4e5ced52](https://github.com/alanmarcero/openEDMDelay/tree/89316aa92ee1a7e7f89aaa771d36276f4e5ced52). [Release CI passed](https://github.com/alanmarcero/openEDMDelay/actions/runs/40609500392): macOS universal, Windows x64 and Linux x64 native jobs, sanitizers, and release publication.
 
 These published digests match GitHub asset metadata and the release's `SHA256SUMS.txt`. The macOS archive was also downloaded and checksum-verified by the Manager installation test below.
 
 | Asset | Target | SHA-256 |
 | --- | --- | --- |
-| [openEDMDelay-macOS-universal.zip](https://github.com/alanmarcero/openEDMDelay/releases/download/v0.1.1/openEDMDelay-macOS-universal.zip) | macOS arm64 + x86_64 | `c7571e647162ef7a001ad75fde89472b7c506c80e43faf3ac2f0c9894dbe407f` |
-| [openEDMDelay-Windows-x64.zip](https://github.com/alanmarcero/openEDMDelay/releases/download/v0.1.1/openEDMDelay-Windows-x64.zip) | Windows x86_64 | `5ce8305f8b805c8ae0180ddaacb7ca7bc522d40ee599bfa5edd2f417196dd2eb` |
-| [openEDMDelay-Linux-x64.zip](https://github.com/alanmarcero/openEDMDelay/releases/download/v0.1.1/openEDMDelay-Linux-x64.zip) | Linux x86_64 | `680ab62d093cb3035050c8a1095a3c4adbde027470d05313cf8ba84465a158f5` |
+| [openEDMDelay-macOS-universal.zip](https://github.com/alanmarcero/openEDMDelay/releases/download/v0.1.1/openEDMDelay-macOS-universal.zip) | macOS arm64 + x86_64 | `017fa410c774d13591b62fda6929aa96f5c54f9df978472dde0f515050ad5116` |
+| [openEDMDelay-Windows-x64.zip](https://github.com/alanmarcero/openEDMDelay/releases/download/v0.1.1/openEDMDelay-Windows-x64.zip) | Windows x86_64 | `29d36f965e3ce788df26b971f2a236ae9aafbf2d8f3a1e9a3d0d7189bf91c9f2` |
+| [openEDMDelay-Linux-x64.zip](https://github.com/alanmarcero/openEDMDelay/releases/download/v0.1.1/openEDMDelay-Linux-x64.zip) | Linux x86_64 | `89e3604df841d17800cffaf6f544bc8347d5ae2199a280ddb3ecc2a5bd32b033` |
 
-At 00:27:16 UTC, the real `ManagerService` fetched the live catalog and release metadata without authentication, downloaded the 32,637,135-byte macOS archive, verified its SHA-256 digest, and installed `openEDMDelay.vst3` and `openEDMDelay.component` into isolated temporary folders. Both bundles contained their native executable and had managed `v0.1.1` receipts. A fresh `Installer` instance detected both receipts. Removal deleted both bundles and emptied the receipts; the temporary tree was then removed. No user plugin folders were changed.
+At 00:41:30 UTC, the real `ManagerService` (through `scripts/cli.mjs`) fetched the live catalog and release metadata without authentication, downloaded the 32,637,153-byte macOS archive, verified its SHA-256 digest, and installed `openEDMDelay.vst3` and `openEDMDelay.component` into isolated temporary folders. Both bundles contained universal arm64 + x86_64 executables, and `list` reported managed `v0.1.1` receipts for both. Removal deleted both bundles and `list` reported the plugin as not installed. No user plugin folders were changed.
 
 Release selection chose the universal archive for both macOS architectures and `openEDMDelay-Windows-x64.zip` for Windows x64. Windows execution was covered by native release CI; this local installation check ran on macOS arm64.
 
-[Manager CI passed](https://github.com/alanmarcero/alan-m-OpenVSTManager/actions/runs/40607885920) at [4a8efd0](https://github.com/alanmarcero/alan-m-OpenVSTManager/commit/4a8efd0a596fc7ef6f31eef81495213a3e0bf4b3): 69 core tests, TypeScript/production build, 11 browser UI tests, and macOS/Windows packaging checks. The live catalog contains ten plugins and retains all nine earlier entries. Existing Manager releases receive the catalog addition through refresh.
+[Manager CI passed](https://github.com/alanmarcero/alan-m-OpenVSTManager/actions/runs/40607885920) at [2982496](https://github.com/alanmarcero/alan-m-OpenVSTManager/commit/2982496638915c22d2f8b2010d3ca988710bf8fa): 69 core tests, TypeScript/production build, 11 browser UI tests, and macOS/Windows packaging checks. The live catalog contains ten plugins and retains all nine earlier entries. Existing Manager releases receive the catalog addition through refresh.
