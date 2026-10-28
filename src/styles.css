@@ -187,6 +187,11 @@ svg { flex-shrink: 0; }
 .toast .icon-button { color: #c9d5da; margin: -4px -4px -4px 5px; flex-shrink: 0; }
 .toast .icon-button:hover { background: #ffffff15; color: white; }
 .toast-error { background: #76514c; color: #fbefed; }
+.active-progress-banner { background: #eef3f5; border: 1px solid #d5e0e3; border-radius: 6px; padding: 12px 16px; margin: 18px 0 10px; display: flex; flex-direction: column; gap: 8px; }
+.active-progress-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12px; font-weight: 500; color: #3d686f; }
+.active-progress-label { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.active-progress-message { text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
+.active-progress-percent { font-variant-numeric: tabular-nums; font-size: 12px; color: #55727a; flex-shrink: 0; }
 .batch-progress { display: flex; align-items: center; gap: 9px; padding: 14px; border: 1px solid #d7e1e4; border-radius: 5px; font-size: 12px; margin-top: 25px; color: #64838b; }
 
 .settings-view .page-header { min-height: 189px; }
@@ -291,6 +296,9 @@ svg { flex-shrink: 0; }
 :is([data-theme="dark"], [data-theme="cyberpunk"]) .state-symbol { color: #97b4c3; background: var(--theme-panel); }
 :is([data-theme="dark"], [data-theme="cyberpunk"]) .switch { background: #4d6270; }
 :is([data-theme="dark"], [data-theme="cyberpunk"]) .switch-on { background: #6b9da6; }
+:is([data-theme="dark"], [data-theme="cyberpunk"]) .active-progress-banner { background: var(--theme-panel); border-color: var(--theme-border); }
+:is([data-theme="dark"], [data-theme="cyberpunk"]) .active-progress-header { color: #9cd0d8; }
+:is([data-theme="dark"], [data-theme="cyberpunk"]) .active-progress-percent { color: #8da4ac; }
 :is([data-theme="dark"], [data-theme="cyberpunk"]) .batch-progress { color: #b2d1d6; border-color: var(--theme-border); }
 :is([data-theme="dark"], [data-theme="cyberpunk"]) .progress-track { background: #344e5a; }
 :is([data-theme="dark"], [data-theme="cyberpunk"]) .progress-track span { background: #8fbdc5; }

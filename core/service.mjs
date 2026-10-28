@@ -183,12 +183,13 @@ export class ManagerService {
           try {
             for (const [gIndex, { asset, formats: grpFormats }] of [...groups.values()].entries()) {
               const archivePath = path.join(temporary, `${gIndex}.zip`);
-              this.progress('all', 'downloading', `Downloading ${plugin.name}`, Math.round((index / plugins.length) * 100));
+              const basePct = Math.round((index / plugins.length) * 100);
+              this.progress(plugin.id, 'downloading', `Downloading ${plugin.name} (${index + 1} of ${plugins.length})`, basePct);
               await downloadAsset({
                 asset, repo: plugin.repo, destination: archivePath,
-                onProgress: percent => this.progress('all', 'downloading', `Downloading ${plugin.name}`, percent),
+                onProgress: percent => this.progress(plugin.id, 'downloading', `Downloading ${plugin.name} (${index + 1} of ${plugins.length})`, Math.round(basePct + (percent / plugins.length))),
               });
-              this.progress('all', 'installing', `Installing ${plugin.name}`);
+              this.progress(plugin.id, 'installing', `Installing ${plugin.name} (${index + 1} of ${plugins.length})`, Math.round(((index + 0.9) / plugins.length) * 100));
               await this.installer.install({
                 plugin, tag: release.tag, archivePath, formats: grpFormats, digest: asset.digest, overwrite: Boolean(options.overwrite || installed.length > 0),
               });
@@ -199,7 +200,7 @@ export class ManagerService {
         } catch (error) {
           await this.log(`installAll (${plugin.id}): ${error.message}`).catch(() => {});
         }
-        this.progress('all', 'installing', 'Installing all plugins', Math.round(((index + 1) / plugins.length) * 100));
+        this.progress(plugin.id, 'installing', `Installed ${plugin.name} (${index + 1} of ${plugins.length})`, Math.round(((index + 1) / plugins.length) * 100));
       }
     });
   }
@@ -240,12 +241,13 @@ export class ManagerService {
           try {
             for (const [gIndex, { asset, formats: grpFormats }] of [...groups.values()].entries()) {
               const archivePath = path.join(temporary, `${gIndex}.zip`);
-              this.progress('all', 'downloading', `Downloading ${plugin.name} update`, Math.round((index / plugins.length) * 100));
+              const basePct = Math.round((index / plugins.length) * 100);
+              this.progress(plugin.id, 'downloading', `Downloading ${plugin.name} update (${index + 1} of ${plugins.length})`, basePct);
               await downloadAsset({
                 asset, repo: plugin.repo, destination: archivePath,
-                onProgress: percent => this.progress('all', 'downloading', `Downloading ${plugin.name} update`, percent),
+                onProgress: percent => this.progress(plugin.id, 'downloading', `Downloading ${plugin.name} update (${index + 1} of ${plugins.length})`, Math.round(basePct + (percent / plugins.length))),
               });
-              this.progress('all', 'installing', `Updating ${plugin.name}`);
+              this.progress(plugin.id, 'installing', `Updating ${plugin.name} (${index + 1} of ${plugins.length})`, Math.round(((index + 0.9) / plugins.length) * 100));
               await this.installer.install({
                 plugin, tag: release.tag, archivePath, formats: grpFormats, digest: asset.digest, overwrite: true,
               });
@@ -256,7 +258,7 @@ export class ManagerService {
         } catch (error) {
           await this.log(`updateAll (${plugin.id}): ${error.message}`).catch(() => {});
         }
-        this.progress('all', 'updating', 'Updating all plugins', Math.round(((index + 1) / plugins.length) * 100));
+        this.progress(plugin.id, 'updating', `Updated ${plugin.name} (${index + 1} of ${plugins.length})`, Math.round(((index + 1) / plugins.length) * 100));
       }
     });
   }

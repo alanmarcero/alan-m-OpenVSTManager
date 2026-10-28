@@ -136,6 +136,10 @@ export function App() {
   const updateCount = plugins.filter(hasUpdate).length;
   const installedCount = plugins.filter(plugin => plugin.installed.length > 0).length;
   const uninstalledCount = plugins.filter(plugin => isAvailable(plugin.releases[0]) && plugin.installed.length === 0).length;
+  const isInstallingAll = busy?.id === 'all' && (busy?.action?.toLowerCase().includes('install') || progress?.phase === 'installing');
+  const isUpdatingAll = busy?.id === 'all' && (busy?.action?.toLowerCase().includes('updat') || progress?.phase === 'updating');
+  const isSingleBusy = busy !== null && busy.id !== 'all' && busy.id !== 'refresh' && busy.id !== 'settings';
+  const activePercent = typeof progress?.percent === 'number' ? Math.min(100, Math.max(0, progress.percent)) : undefined;
   const visible = plugins.filter(plugin => {
     if (view === 'installed' && plugin.installed.length === 0) return false;
     if (view === 'updates' && !hasUpdate(plugin)) return false;
@@ -156,10 +160,23 @@ export function App() {
         return await manager.installAll();
       }
       let next = state!;
-      for (const plugin of toInstall) {
+      for (const [index, plugin] of toInstall.entries()) {
         const formats: PluginFormat[] = plugin.formats.includes('VST3') ? ['VST3'] : plugin.formats.slice(0, 1);
         if (formats.length && plugin.releases[0]) {
+          const basePct = Math.round((index / toInstall.length) * 100);
+          setProgress({
+            id: plugin.id,
+            phase: 'installing',
+            message: `Installing ${plugin.name} (${index + 1} of ${toInstall.length})`,
+            percent: basePct,
+          });
           next = await manager.install({ id: plugin.id, tag: plugin.releases[0].tag, formats });
+          setProgress({
+            id: plugin.id,
+            phase: 'installing',
+            message: `Installed ${plugin.name} (${index + 1} of ${toInstall.length})`,
+            percent: Math.round(((index + 1) / toInstall.length) * 100),
+          });
         }
       }
       return next;
@@ -170,10 +187,28 @@ export function App() {
     const updates = plugins.filter(hasUpdate);
     if (updates.length === 0) return;
     await operate('all', 'Updating plugins', async () => {
+      if (manager.updateAll) {
+        return await manager.updateAll();
+      }
       let next = state!;
-      for (const plugin of updates) {
+      for (const [index, plugin] of updates.entries()) {
         const formats = plugin.installed.filter(item => needsUpdate(item, plugin.releases[0])).map(item => item.format);
-        if (formats.length) next = await manager.install({ id: plugin.id, tag: plugin.releases[0].tag, formats });
+        if (formats.length) {
+          const basePct = Math.round((index / updates.length) * 100);
+          setProgress({
+            id: plugin.id,
+            phase: 'updating',
+            message: `Updating ${plugin.name} (${index + 1} of ${updates.length})`,
+            percent: basePct,
+          });
+          next = await manager.install({ id: plugin.id, tag: plugin.releases[0].tag, formats });
+          setProgress({
+            id: plugin.id,
+            phase: 'updating',
+            message: `Updated ${plugin.name} (${index + 1} of ${updates.length})`,
+            percent: Math.round(((index + 1) / updates.length) * 100),
+          });
+        }
       }
       return next;
     }, 'Your plugins are up to date.');
@@ -229,26 +264,30 @@ export function App() {
               {(state.offline || state.error) && <div className="connection-notice" role="status">{state.offline ? <WifiOff size={17} /> : <CircleAlert size={17} />}<span>{state.error || 'You’re offline. Showing your saved releases; reconnect to check for updates.'}</span></div>}
               {view === 'settings' ? <SettingsPanel key={JSON.stringify(state.settings)} state={state} manager={manager} busy={busy} save={settings => operate('settings', 'Saving settings', () => manager.saveSettings(settings), 'Settings saved.')} onError={message => setNotice({ kind: 'error', message })} openExternal={openExternal} operate={operate} />
                 : <>
-                  <section className="library-toolbar" aria-label="Filter plugins"><div className="search-field"><Search size={17} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search plugins" aria-label="Search plugins" />{query && <button className="icon-button clear-search" aria-label="Clear search" onClick={() => setQuery('')}><X size={14} /></button>}</div><div className="category-select"><SlidersHorizontal size={15} /><select aria-label="Category" value={category} onChange={event => setCategory(event.target.value)}><option>All categories</option>{categories.map(item => <option key={item}>{item}</option>)}</select><ChevronDown size={13} /></div><div className="toolbar-actions">{uninstalledCount > 0 && (view === 'library' || view === 'installed') && <button className="button button-primary install-all" disabled={Boolean(busy)} onClick={() => void installAll()}><Download size={15} />Install all</button>}{updateCount > 0 && (view === 'updates' || view === 'installed' || view === 'library') && <button className={`button ${uninstalledCount > 0 && view === 'library' ? 'button-secondary' : 'button-primary'} update-all`} disabled={Boolean(busy)} onClick={() => void updateAll()}>{uninstalledCount > 0 && view === 'library' ? <RefreshCw size={14} /> : <Download size={15} />}Update all</button>}{installedCount > 0 && (view === 'installed' || view === 'updates') && <button className="button button-danger uninstall-all" disabled={Boolean(busy)} onClick={() => setConfirmUninstallAll(true)}><Trash2 size={15} />Uninstall all</button>}<span className="result-count">{visible.length} {visible.length === 1 ? 'plugin' : 'plugins'}</span></div></section>
+                  <section className="library-toolbar" aria-label="Filter plugins"><div className="search-field"><Search size={17} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search plugins" aria-label="Search plugins" />{query && <button className="icon-button clear-search" aria-label="Clear search" onClick={() => setQuery('')}><X size={14} /></button>}</div><div className="category-select"><SlidersHorizontal size={15} /><select aria-label="Category" value={category} onChange={event => setCategory(event.target.value)}><option>All categories</option>{categories.map(item => <option key={item}>{item}</option>)}</select><ChevronDown size={13} /></div><div className="toolbar-actions">{uninstalledCount > 0 && (view === 'library' || view === 'installed') && <button className="button button-primary install-all" disabled={Boolean(busy)} onClick={() => void installAll()}>{isInstallingAll ? <LoaderCircle size={15} className="spin" /> : <Download size={15} />}{isInstallingAll ? 'Installing all…' : 'Install all'}</button>}{updateCount > 0 && (view === 'updates' || view === 'installed' || view === 'library') && <button className={`button ${uninstalledCount > 0 && view === 'library' ? 'button-secondary' : 'button-primary'} update-all`} disabled={Boolean(busy)} onClick={() => void updateAll()}>{isUpdatingAll ? <LoaderCircle size={15} className="spin" /> : (uninstalledCount > 0 && view === 'library' ? <RefreshCw size={14} /> : <Download size={15} />)}{isUpdatingAll ? 'Updating all…' : 'Update all'}</button>}{installedCount > 0 && (view === 'installed' || view === 'updates') && <button className="button button-danger uninstall-all" disabled={Boolean(busy)} onClick={() => setConfirmUninstallAll(true)}><Trash2 size={15} />Uninstall all</button>}<span className="result-count">{visible.length} {visible.length === 1 ? 'plugin' : 'plugins'}</span></div></section>
+                  {(busy?.id === 'all' || isSingleBusy) && <div className="active-progress-banner" role="status" aria-label="Operation progress"><div className="active-progress-header"><div className="active-progress-label"><LoaderCircle className="spin" size={15} /><span className="active-progress-message">{progress?.message || (busy?.action ? `${busy.action}…` : 'Processing…')}</span></div>{activePercent !== undefined && <span className="active-progress-percent">{activePercent}%</span>}</div><div className={`progress-track ${activePercent === undefined ? 'indeterminate' : ''}`} role="progressbar" aria-label="Operation progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={activePercent}><span style={activePercent === undefined ? undefined : { width: `${activePercent}%` }} /></div></div>}
                   {visible.length === 0 ? <div className="state-screen empty-state"><span className="state-symbol">{view === 'updates' && !query && category === 'All categories' ? <CheckCheck size={31} strokeWidth={1.5} /> : <AudioLines size={31} strokeWidth={1.5} />}</span><h2>{query || category !== 'All categories' ? 'No matching plugins' : view === 'installed' ? 'Your collection starts here' : view === 'updates' ? 'You’re up to date' : 'No plugins to show'}</h2><p>{query || category !== 'All categories' ? 'Try another search or choose a different category.' : view === 'installed' ? 'Choose a plugin from the library to install your first audio tool.' : view === 'updates' ? 'There are no newer releases for your installed plugins.' : 'Check for updates to load available releases.'}</p>{query || category !== 'All categories' ? <button className="button button-secondary" onClick={() => { setQuery(''); setCategory('All categories'); }}>Clear filters</button> : view === 'installed' ? <button className="button button-secondary" onClick={() => navigate('library')}>Browse library</button> : null}</div>
-                    : <div className="library-layout"><section className="plugin-list" aria-label="Plugin library"><div className="list-heading"><span>Plugin</span><span>Version</span></div>{visible.map(plugin => <PluginRow key={plugin.id} plugin={plugin} selected={plugin.id === selected?.id} busy={busy} onSelect={() => setSelectedId(plugin.id)} />)}<p className="library-footnote">Rescan plugins in your DAW after installing.</p></section>{selected && <PluginDetail key={selected.id} plugin={selected} state={state} busy={busy} progress={progress} openExternal={openExternal} install={(tag, formats, options) => operate(selected.id, 'Installing', () => manager.install({ id: selected.id, tag, formats, ...options }), `${selected.name} installed.`)} uninstall={(formats, options) => operate(selected.id, 'Removing', () => manager.uninstall({ id: selected.id, formats, ...options }), `${selected.name} removed.`)} move={(formats, options) => operate(selected.id, 'Moving', () => manager.move ? manager.move({ id: selected.id, formats, ...options }) : manager.install({ id: selected.id, tag: selected.releases[0]?.tag ?? '', formats, ...options }), `${selected.name} moved.`)} />}</div>}
+                    : <div className="library-layout"><section className="plugin-list" aria-label="Plugin library"><div className="list-heading"><span>Plugin</span><span>Version</span></div>{visible.map(plugin => <PluginRow key={plugin.id} plugin={plugin} selected={plugin.id === selected?.id} busy={busy} progress={progress} onSelect={() => setSelectedId(plugin.id)} />)}<p className="library-footnote">Rescan plugins in your DAW after installing.</p></section>{selected && <PluginDetail key={selected.id} plugin={selected} state={state} busy={busy} progress={progress} openExternal={openExternal} install={(tag, formats, options) => operate(selected.id, 'Installing', () => manager.install({ id: selected.id, tag, formats, ...options }), `${selected.name} installed.`)} uninstall={(formats, options) => operate(selected.id, 'Removing', () => manager.uninstall({ id: selected.id, formats, ...options }), `${selected.name} removed.`)} move={(formats, options) => operate(selected.id, 'Moving', () => manager.move ? manager.move({ id: selected.id, formats, ...options }) : manager.install({ id: selected.id, tag: selected.releases[0]?.tag ?? '', formats, ...options }), `${selected.name} moved.`)} />}</div>}
                 </>}
             </>}
-      {busy?.id === 'all' && <div className="batch-progress" role="status"><LoaderCircle className="spin" size={16} /><span>{progress?.message || (busy?.action ? `${busy.action}…` : 'Processing…')}</span></div>}
     </main>
     {confirmUninstallAll && <ConfirmDialog title="Uninstall all plugins?" description={`This removes all ${installedCount} installed plugin${installedCount === 1 ? '' : 's'} from your computer.`} cancelLabel="Keep plugins" actionLabel="Uninstall all" danger={true} busy={Boolean(busy)} onCancel={() => setConfirmUninstallAll(false)} onConfirm={async () => { await uninstallAll(); setConfirmUninstallAll(false); }} />}
     {notice && <div className={`toast toast-${notice.kind}`} role={notice.kind === 'error' ? 'alert' : 'status'}>{notice.kind === 'error' ? <CircleAlert size={18} /> : <CircleCheck size={18} />}<span>{notice.message}</span><button className="icon-button" aria-label="Dismiss notification" onClick={() => setNotice(null)}><X size={16} /></button></div>}
   </div>;
 }
 
-function PluginRow({ plugin, selected, busy, onSelect }: { plugin: Plugin; selected: boolean; busy: Busy; onSelect: () => void }) {
+function PluginRow({ plugin, selected, busy, progress, onSelect }: { plugin: Plugin; selected: boolean; busy: Busy; progress: Progress | null; onSelect: () => void }) {
   const update = hasUpdate(plugin);
   const installed = plugin.installed.length > 0;
   const release = plugin.releases[0];
+  const isWorking = busy?.id === plugin.id || (busy?.id === 'all' && progress?.id === plugin.id);
+  const workingAction = busy?.id === plugin.id
+    ? (busy.action === 'Installing' && update ? 'Updating…' : `${busy.action}…`)
+    : (progress?.phase === 'updating' ? 'Updating…' : 'Installing…');
   return <button className={`plugin-row ${selected ? 'selected' : ''}`} onClick={onSelect} aria-pressed={selected}>
     <PluginGlyph id={plugin.id} />
     <span className="plugin-row-copy"><span className="plugin-name">{plugin.name}</span><span className="plugin-category">{plugin.category}</span></span>
-    <span className="plugin-row-status"><span className="plugin-version">{release ? formatVersion(release.tag) : '—'}</span><span className={`status-label ${update ? 'status-update' : installed ? 'status-installed' : ''}`}>{busy?.id === plugin.id ? <><LoaderCircle size={11} className="spin" />{busy.action}</> : update ? <><span className="status-dot" />Update available</> : installed ? <><Check size={12} />Installed</> : plugin.error ? 'Release unavailable' : isAvailable(release) ? plugin.formats.join(' / ') : 'Source available'}</span></span>
+    <span className="plugin-row-status"><span className="plugin-version">{release ? formatVersion(release.tag) : '—'}</span><span className={`status-label ${update ? 'status-update' : installed ? 'status-installed' : ''}`}>{isWorking ? <><LoaderCircle size={11} className="spin" />{workingAction}</> : update ? <><span className="status-dot" />Update available</> : installed ? <><Check size={12} />Installed</> : plugin.error ? 'Release unavailable' : isAvailable(release) ? plugin.formats.join(' / ') : 'Source available'}</span></span>
     <ChevronRight className="row-chevron" size={14} />
   </button>;
 }
@@ -327,7 +366,7 @@ function PluginDetail({ plugin, state, busy, progress, openExternal, install, un
       <div className="install-actions">
         <button className="button button-primary install-button" disabled={Boolean(busy) || formats.length === 0 || sameVersion} onClick={handleInstallClick}>
           {working ? <LoaderCircle size={16} className="spin" /> : sameVersion ? <Check size={16} /> : <Download size={16} />}
-          {working ? busy?.action === 'Removing' ? 'Removing…' : busy?.action === 'Moving' ? 'Moving…' : 'Installing…' : action}
+          {working ? busy?.action === 'Removing' ? 'Removing…' : busy?.action === 'Moving' ? 'Moving…' : (busy?.action === 'Updating' || action === 'Update plugin') ? 'Updating…' : 'Installing…' : action}
         </button>
         {sameVersion && (
           <button
@@ -346,7 +385,7 @@ function PluginDetail({ plugin, state, busy, progress, openExternal, install, un
         <button className="button button-secondary" onClick={() => void openExternal(`${plugin.url}#readme`)}>Build from source<ArrowUpRight size={14} /></button>
       </div>
     )}
-    {working && <div className="install-progress" role="status"><div className={`progress-track ${percent === undefined ? 'indeterminate' : ''}`} role="progressbar" aria-label="Installation progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}><span style={percent === undefined ? undefined : { width: `${percent}%` }} /></div><p>{progress?.id === plugin.id ? progress.message : 'Preparing…'}</p></div>}
+    {working && <div className="install-progress" role="status"><div className={`progress-track ${percent === undefined ? 'indeterminate' : ''}`} role="progressbar" aria-label="Installation progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}><span style={percent === undefined ? undefined : { width: `${percent}%` }} /></div><p>{(progress?.id === plugin.id && progress?.message) ? progress.message : busy?.action ? `${busy.action}…` : 'Preparing…'}</p></div>}
     {hasOldLocation && <p className="unmanaged-note"><CircleAlert size={14} /><span>Installed in a previous folder. Click "{action}" to move it to your current folder.</span></p>}
     {unmanaged.length > 0 && <p className="unmanaged-note"><CircleAlert size={14} /><span>{unmanaged.map(item => item.format).join(', ')} found outside this manager. You can replace it with a managed copy or remove it.</span></p>}
     {plugin.installed.length > 0 && <div className="installed-details"><div className="installed-details-heading"><Check size={13} /><span>On this computer</span><button className="icon-button remove-button" onClick={() => setConfirmRemove(true)} disabled={Boolean(busy)} aria-label={`Remove ${plugin.name}`} title="Remove plugin"><Trash2 size={14} /></button></div>{plugin.installed.map(item => <div className="installed-version" key={item.path} title={item.path}><span>{item.format}{!item.managed ? ' (outside manager)' : item.locationMismatch ? ' (previous folder)' : ''}</span><span>{item.version ? formatVersion(item.version) : 'installed'}</span></div>)}</div>}
