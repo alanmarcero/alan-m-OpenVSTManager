@@ -62,3 +62,21 @@ No build or download blockers remain. The Winamp source-license omission remains
 The real manager service downloaded these public assets without authentication, checked their GitHub SHA-256 digests, installed each format into isolated folders, detected managed v1.0.0 receipts, and removed the bundles cleanly. Extracted macOS bundles passed strict code-signature verification and contained both architecture slices. The Windows archive passed the same installer path with Windows platform selection on macOS, and its PE header was verified as x64; actual Windows execution was validated by CI. No user plugin folders were changed by this installation test.
 
 Catalog integration passed 63 core tests, TypeScript/production build, and nine browser UI tests. Existing manager releases refresh this public catalog; a new manager binary is not required.
+
+## openEDMDelay addition — 2026-10-28 UTC
+
+[openEDMDelay v0.1.1](https://github.com/alanmarcero/openEDMDelay/releases/tag/v0.1.1) was built from [d1aed020edcc450d51b97df654a4481c869fa516](https://github.com/alanmarcero/openEDMDelay/tree/d1aed020edcc450d51b97df654a4481c869fa516). [Release CI passed](https://github.com/alanmarcero/openEDMDelay/actions/runs/40607995234): macOS universal, Windows x64 and Linux x64 native jobs, sanitizers, and release publication.
+
+These published digests match GitHub asset metadata and the release's `SHA256SUMS.txt`. The macOS archive was also downloaded and checksum-verified by the Manager installation test below.
+
+| Asset | Target | SHA-256 |
+| --- | --- | --- |
+| [openEDMDelay-macOS-universal.zip](https://github.com/alanmarcero/openEDMDelay/releases/download/v0.1.1/openEDMDelay-macOS-universal.zip) | macOS arm64 + x86_64 | `c7571e647162ef7a001ad75fde89472b7c506c80e43faf3ac2f0c9894dbe407f` |
+| [openEDMDelay-Windows-x64.zip](https://github.com/alanmarcero/openEDMDelay/releases/download/v0.1.1/openEDMDelay-Windows-x64.zip) | Windows x86_64 | `5ce8305f8b805c8ae0180ddaacb7ca7bc522d40ee599bfa5edd2f417196dd2eb` |
+| [openEDMDelay-Linux-x64.zip](https://github.com/alanmarcero/openEDMDelay/releases/download/v0.1.1/openEDMDelay-Linux-x64.zip) | Linux x86_64 | `680ab62d093cb3035050c8a1095a3c4adbde027470d05313cf8ba84465a158f5` |
+
+At 00:27:16 UTC, the real `ManagerService` fetched the live catalog and release metadata without authentication, downloaded the 32,637,135-byte macOS archive, verified its SHA-256 digest, and installed `openEDMDelay.vst3` and `openEDMDelay.component` into isolated temporary folders. Both bundles contained their native executable and had managed `v0.1.1` receipts. A fresh `Installer` instance detected both receipts. Removal deleted both bundles and emptied the receipts; the temporary tree was then removed. No user plugin folders were changed.
+
+Release selection chose the universal archive for both macOS architectures and `openEDMDelay-Windows-x64.zip` for Windows x64. Windows execution was covered by native release CI; this local installation check ran on macOS arm64.
+
+[Manager CI passed](https://github.com/alanmarcero/alan-m-OpenVSTManager/actions/runs/40607885920) at [4a8efd0](https://github.com/alanmarcero/alan-m-OpenVSTManager/commit/4a8efd0a596fc7ef6f31eef81495213a3e0bf4b3): 69 core tests, TypeScript/production build, 11 browser UI tests, and macOS/Windows packaging checks. The live catalog contains ten plugins and retains all nine earlier entries. Existing Manager releases receive the catalog addition through refresh.
