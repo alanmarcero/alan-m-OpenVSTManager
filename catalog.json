@@ -1,5 +1,16 @@
 [
   {
+    "id": "openEDMDelay",
+    "repo": "openEDMDelay",
+    "name": "openEDMDelay",
+    "description": "A beat-synced eight-tap delay with ping-pong, digital, tape, BBD and lo-fi characters, selectable high/low-pass slopes, ducking and glitch effects.",
+    "category": "Delay",
+    "bundleNames": {
+      "VST3": "openEDMDelay.vst3",
+      "AU": "openEDMDelay.component"
+    }
+  },
+  {
     "id": "openWallLimiter",
     "repo": "openWallLimiter",
     "name": "openWallLimiter",
