@@ -38,6 +38,7 @@ else {
   const handlers={
     getState:()=>manager.getState(),refresh:()=>manager.refresh(),
     install:request=>manager.install(request),uninstall:request=>manager.uninstall(request),
+    installAll:options=>manager.installAll(options),updateAll:options=>manager.updateAll(options),
     uninstallAll:options=>manager.uninstallAll(options),
     move:request=>manager.move(request),moveAll:()=>manager.moveAll(),
     saveSettings:patch=>manager.saveSettings(patch),

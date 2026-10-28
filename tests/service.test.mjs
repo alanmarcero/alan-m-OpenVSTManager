@@ -70,3 +70,29 @@ test('service routes move, moveAll, and overwrite/unmanaged flags correctly', as
   await service.uninstallAll();
   assert.deepEqual(uninstalledFormats, ['VST3']);
 });
+
+test('service routes installAll and updateAll correctly', async t => {
+  const {service,client}=await setup(t);
+  const installedPlugins = [];
+  t.mock.method(globalThis, 'fetch', async () => new Response('hello'));
+  service.installer.install = async (opts) => { installedPlugins.push(opts); return []; };
+  service.installer.detect = async () => [];
+  client.releases = async () => ({
+    data: [{ tag_name: 'v1.0.0', published_at: '2026-10-20T00:00:00Z', assets: [{ name: 'openMaster-macOS.zip', browser_download_url: 'https://github.com/alanmarcero/openMaster/releases/download/v1.0.0/openMaster-macOS.zip', size: 5 }] }],
+    stale: false,
+    fetchedAt: 12345,
+  });
+
+  await service.installAll();
+  assert.equal(installedPlugins.length, 1);
+  assert.equal(installedPlugins[0].plugin.id, 'openMaster');
+  assert.equal(installedPlugins[0].tag, 'v1.0.0');
+
+  installedPlugins.length = 0;
+  service.installer.detect = async () => [{ format: 'VST3', version: 'v0.9.0', managed: true }];
+  await service.updateAll();
+  assert.equal(installedPlugins.length, 1);
+  assert.equal(installedPlugins[0].plugin.id, 'openMaster');
+  assert.equal(installedPlugins[0].tag, 'v1.0.0');
+  assert.equal(installedPlugins[0].overwrite, true);
+});

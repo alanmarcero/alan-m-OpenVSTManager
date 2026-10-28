@@ -7,7 +7,7 @@ A quiet home for Alan Marcero's audio plugins. Browse releases, install the form
 ![OpenVST Manager](docs/screenshots/library.png)
 
 - Install VST3 plugins and available Audio Units directly from public GitHub Releases.
-- See installed versions, update all managed plugins, or choose an older release.
+- Install all available plugins or update all managed plugins with one button press, or choose an older release.
 - Search the library, choose custom installation folders, and remove managed installations.
 - Switch between Light, Dark, and Cyberpunk from the main page.
 - Browse cached releases offline. No account, token, subscription, or background service.
@@ -90,6 +90,8 @@ The source checkout includes the same manager core without a window:
 npm run cli -- list
 npm run cli -- install openMaster --format VST3
 npm run cli -- install openMaster --version v1.0.0 --format VST3
+npm run cli -- install-all
+npm run cli -- update-all
 npm run cli -- uninstall openMaster --format VST3
 npm run cli -- paths
 npm run cli -- paths VST3 /absolute/path/to/plugins

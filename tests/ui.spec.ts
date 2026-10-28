@@ -205,3 +205,11 @@ test('can uninstall all installed plugins with confirmation', async ({ page }) =
     { kind: 'uninstall', id: 'openEDMFilter', formats: ['VST3'], unmanaged: true },
   ]);
 });
+
+test('can install all uninstalled plugins with one button press', async ({ page }) => {
+  await expect(page.getByRole('button', { name: 'Install all', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Install all', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Install all', exact: true })).toHaveCount(0);
+  const installCalls = await page.evaluate(() => window.__managerTest.calls.filter(c => c.kind === 'install'));
+  expect(installCalls.length).toBe(catalog.length - 1);
+});

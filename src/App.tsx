@@ -135,6 +135,7 @@ export function App() {
   const plugins = state?.plugins ?? [];
   const updateCount = plugins.filter(hasUpdate).length;
   const installedCount = plugins.filter(plugin => plugin.installed.length > 0).length;
+  const uninstalledCount = plugins.filter(plugin => isAvailable(plugin.releases[0]) && plugin.installed.length === 0).length;
   const visible = plugins.filter(plugin => {
     if (view === 'installed' && plugin.installed.length === 0) return false;
     if (view === 'updates' && !hasUpdate(plugin)) return false;
@@ -146,6 +147,24 @@ export function App() {
   const viewTitle = { library: 'Library', installed: 'Installed', updates: 'Updates', settings: 'Settings' }[view];
 
   const navigate = (next: View) => { setView(next); setQuery(''); setCategory('All categories'); };
+  const installAll = async () => {
+    if (!manager) return;
+    const toInstall = plugins.filter(plugin => isAvailable(plugin.releases[0]) && plugin.installed.length === 0);
+    if (toInstall.length === 0) return;
+    await operate('all', 'Installing all plugins', async () => {
+      if (manager.installAll) {
+        return await manager.installAll();
+      }
+      let next = state!;
+      for (const plugin of toInstall) {
+        const formats: PluginFormat[] = plugin.formats.includes('VST3') ? ['VST3'] : plugin.formats.slice(0, 1);
+        if (formats.length && plugin.releases[0]) {
+          next = await manager.install({ id: plugin.id, tag: plugin.releases[0].tag, formats });
+        }
+      }
+      return next;
+    }, 'All plugins installed.');
+  };
   const updateAll = async () => {
     if (!manager) return;
     const updates = plugins.filter(hasUpdate);
@@ -210,7 +229,7 @@ export function App() {
               {(state.offline || state.error) && <div className="connection-notice" role="status">{state.offline ? <WifiOff size={17} /> : <CircleAlert size={17} />}<span>{state.error || 'You’re offline. Showing your saved releases; reconnect to check for updates.'}</span></div>}
               {view === 'settings' ? <SettingsPanel key={JSON.stringify(state.settings)} state={state} manager={manager} busy={busy} save={settings => operate('settings', 'Saving settings', () => manager.saveSettings(settings), 'Settings saved.')} onError={message => setNotice({ kind: 'error', message })} openExternal={openExternal} operate={operate} />
                 : <>
-                  <section className="library-toolbar" aria-label="Filter plugins"><div className="search-field"><Search size={17} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search plugins" aria-label="Search plugins" />{query && <button className="icon-button clear-search" aria-label="Clear search" onClick={() => setQuery('')}><X size={14} /></button>}</div><div className="category-select"><SlidersHorizontal size={15} /><select aria-label="Category" value={category} onChange={event => setCategory(event.target.value)}><option>All categories</option>{categories.map(item => <option key={item}>{item}</option>)}</select><ChevronDown size={13} /></div><div className="toolbar-actions">{updateCount > 0 && (view === 'updates' || view === 'installed') && <button className="button button-primary update-all" disabled={Boolean(busy)} onClick={() => void updateAll()}><Download size={15} />Update all</button>}{installedCount > 0 && (view === 'installed' || view === 'updates') && <button className="button button-danger uninstall-all" disabled={Boolean(busy)} onClick={() => setConfirmUninstallAll(true)}><Trash2 size={15} />Uninstall all</button>}<span className="result-count">{visible.length} {visible.length === 1 ? 'plugin' : 'plugins'}</span></div></section>
+                  <section className="library-toolbar" aria-label="Filter plugins"><div className="search-field"><Search size={17} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search plugins" aria-label="Search plugins" />{query && <button className="icon-button clear-search" aria-label="Clear search" onClick={() => setQuery('')}><X size={14} /></button>}</div><div className="category-select"><SlidersHorizontal size={15} /><select aria-label="Category" value={category} onChange={event => setCategory(event.target.value)}><option>All categories</option>{categories.map(item => <option key={item}>{item}</option>)}</select><ChevronDown size={13} /></div><div className="toolbar-actions">{uninstalledCount > 0 && (view === 'library' || view === 'installed') && <button className="button button-primary install-all" disabled={Boolean(busy)} onClick={() => void installAll()}><Download size={15} />Install all</button>}{updateCount > 0 && (view === 'updates' || view === 'installed' || view === 'library') && <button className={`button ${uninstalledCount > 0 && view === 'library' ? 'button-secondary' : 'button-primary'} update-all`} disabled={Boolean(busy)} onClick={() => void updateAll()}>{uninstalledCount > 0 && view === 'library' ? <RefreshCw size={14} /> : <Download size={15} />}Update all</button>}{installedCount > 0 && (view === 'installed' || view === 'updates') && <button className="button button-danger uninstall-all" disabled={Boolean(busy)} onClick={() => setConfirmUninstallAll(true)}><Trash2 size={15} />Uninstall all</button>}<span className="result-count">{visible.length} {visible.length === 1 ? 'plugin' : 'plugins'}</span></div></section>
                   {visible.length === 0 ? <div className="state-screen empty-state"><span className="state-symbol">{view === 'updates' && !query && category === 'All categories' ? <CheckCheck size={31} strokeWidth={1.5} /> : <AudioLines size={31} strokeWidth={1.5} />}</span><h2>{query || category !== 'All categories' ? 'No matching plugins' : view === 'installed' ? 'Your collection starts here' : view === 'updates' ? 'You’re up to date' : 'No plugins to show'}</h2><p>{query || category !== 'All categories' ? 'Try another search or choose a different category.' : view === 'installed' ? 'Choose a plugin from the library to install your first audio tool.' : view === 'updates' ? 'There are no newer releases for your installed plugins.' : 'Check for updates to load available releases.'}</p>{query || category !== 'All categories' ? <button className="button button-secondary" onClick={() => { setQuery(''); setCategory('All categories'); }}>Clear filters</button> : view === 'installed' ? <button className="button button-secondary" onClick={() => navigate('library')}>Browse library</button> : null}</div>
                     : <div className="library-layout"><section className="plugin-list" aria-label="Plugin library"><div className="list-heading"><span>Plugin</span><span>Version</span></div>{visible.map(plugin => <PluginRow key={plugin.id} plugin={plugin} selected={plugin.id === selected?.id} busy={busy} onSelect={() => setSelectedId(plugin.id)} />)}<p className="library-footnote">Rescan plugins in your DAW after installing.</p></section>{selected && <PluginDetail key={selected.id} plugin={selected} state={state} busy={busy} progress={progress} openExternal={openExternal} install={(tag, formats, options) => operate(selected.id, 'Installing', () => manager.install({ id: selected.id, tag, formats, ...options }), `${selected.name} installed.`)} uninstall={(formats, options) => operate(selected.id, 'Removing', () => manager.uninstall({ id: selected.id, formats, ...options }), `${selected.name} removed.`)} move={(formats, options) => operate(selected.id, 'Moving', () => manager.move ? manager.move({ id: selected.id, formats, ...options }) : manager.install({ id: selected.id, tag: selected.releases[0]?.tag ?? '', formats, ...options }), `${selected.name} moved.`)} />}</div>}
                 </>}

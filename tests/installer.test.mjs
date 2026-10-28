@@ -195,7 +195,8 @@ test('refuses a managed path redirected through a symlink', async (t) => {
   const outside = path.join(f.root, 'outside');
   await mkdir(path.join(outside, 'Test.vst3'), { recursive: true });
   await writeFile(path.join(outside, 'Test.vst3', 'keep'), 'safe');
-  await symlink(outside, f.paths.VST3, 'dir');
+  const symlinkType = process.platform === 'win32' ? 'junction' : 'dir';
+  await symlink(outside, f.paths.VST3, symlinkType);
   await assert.rejects(f.installer.uninstall({ plugin, formats: ['VST3'] }), /path|changed|symlink|ownership/i);
   assert.equal(await readFile(path.join(outside, 'Test.vst3', 'keep'), 'utf8'), 'safe');
 });

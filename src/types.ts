@@ -74,9 +74,10 @@ export interface ManagerAPI {
   getState(): Promise<ManagerState>;
   refresh(): Promise<ManagerState>;
   install(options: { id: string; tag: string; formats: PluginFormat[]; overwrite?: boolean }): Promise<ManagerState>;
+  installAll?(options?: { overwrite?: boolean }): Promise<ManagerState>;
   uninstall(options: { id: string; formats: PluginFormat[]; unmanaged?: boolean }): Promise<ManagerState>;
   uninstallAll?(options?: { unmanaged?: boolean }): Promise<ManagerState>;
-  updateAll?(): Promise<ManagerState>;
+  updateAll?(options?: { overwrite?: boolean }): Promise<ManagerState>;
   move?(options: { id: string; formats: PluginFormat[]; overwrite?: boolean }): Promise<ManagerState>;
   moveAll?(): Promise<ManagerState>;
   saveSettings(settings: { includePrereleases?: boolean; paths?: Partial<Record<PluginFormat, string>> }): Promise<ManagerState>;

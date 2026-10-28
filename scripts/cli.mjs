@@ -33,7 +33,9 @@ try{
     const plugin=state.plugins.find(p=>p.id===id);
     if(!plugin)throw new Error('Unknown plugin. Run list to see plugin IDs.');
     await manager.install({id,tag:values.version||plugin.releases[0]?.tag,formats:[values.format]});
-  }else if(command==='uninstall')await manager.uninstall({id,formats:[values.format]});
+  }else if(command==='install-all')await manager.installAll();
+  else if(command==='update-all')await manager.updateAll();
+  else if(command==='uninstall')await manager.uninstall({id,formats:[values.format]});
   else if(command==='uninstall-all')await manager.uninstallAll();
   else throw new Error('Unknown command. Use --help.');
 }catch(error){console.error(error.message);process.exitCode=1;}

@@ -65,7 +65,8 @@ test('refuses to extract through a preexisting directory symlink', async (t) => 
   const f = await fixture(t, [{ name: 'link/escape', content: 'unsafe' }]);
   await mkdir(f.destination);
   await mkdir(path.join(f.root, 'outside'));
-  await symlink(path.join(f.root, 'outside'), path.join(f.destination, 'link'), 'dir');
+  const symlinkType = process.platform === 'win32' ? 'junction' : 'dir';
+  await symlink(path.join(f.root, 'outside'), path.join(f.destination, 'link'), symlinkType);
   await assert.rejects(extractArchive(f.archive, f.destination), /symlink|unsafe|empty/i);
   await assert.rejects(stat(path.join(f.root, 'outside', 'escape')), { code: 'ENOENT' });
 });
@@ -103,7 +104,8 @@ test('rejects a symlink used as the extraction root', async (t) => {
   const f = await fixture(t, [{ name: 'escape', content: 'unsafe' }]);
   const outside = path.join(f.root, 'outside');
   await mkdir(outside);
-  await symlink(outside, f.destination, 'dir');
+  const symlinkType = process.platform === 'win32' ? 'junction' : 'dir';
+  await symlink(outside, f.destination, symlinkType);
   await assert.rejects(extractArchive(f.archive, f.destination), /symlink/i);
   await assert.rejects(stat(path.join(outside, 'escape')), { code: 'ENOENT' });
 });
