@@ -43,6 +43,17 @@
     }
   },
   {
+    "id": "openEDMKick",
+    "repo": "openEDMKick",
+    "name": "openEDMKick",
+    "description": "A 12-note tuned kick drum synth with Locked-In WAV caching, Beat-4 synced reverse and bitcrush FX, A/B/C/D 1/64 auto builds, and Kick Mule on stage.",
+    "category": "Instrument",
+    "bundleNames": {
+      "VST3": "openEDMKick.vst3",
+      "AU": "openEDMKick.component"
+    }
+  },
+  {
     "id": "openSausage",
     "repo": "openSausage",
     "name": "openSausage",
