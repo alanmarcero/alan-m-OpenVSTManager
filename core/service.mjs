@@ -150,25 +150,25 @@ export class ManagerService {
     await this.getState();
     const plugins = this.catalog;
     return this.operate('all', async () => {
+      const candidates = [];
+      for (const plugin of plugins) {
+        const installed = await this.installer.detect(plugin);
+        if (installed.length > 0 && !options.overwrite) continue;
+        const releases = normalizeReleases(this.releases.get(plugin.id)?.data || [], {
+          platform: this.platform, arch: this.arch, repo: plugin.repo, includePrereleases: this.settings.includePrereleases,
+        });
+        const release = releases.find(r => r.assets.some(a => a.compatible));
+        if (!release) continue;
+        const supported = Object.keys(plugin.bundleNames).filter(f => f === 'VST3' || this.platform === 'darwin');
+        const formats = installed.length > 0
+          ? [...new Set(installed.map(i => i.format))]
+          : (supported.includes('VST3') ? ['VST3'] : supported.slice(0, 1));
+        if (!formats.length) continue;
+        candidates.push({ plugin, installed, release, formats });
+      }
       this.progress('all', 'installing', 'Installing all plugins', 0);
-      for (const [index, plugin] of plugins.entries()) {
+      for (const [index, { plugin, installed, release, formats }] of candidates.entries()) {
         try {
-          const installed = await this.installer.detect(plugin);
-          if (installed.length > 0 && !options.overwrite) {
-            continue;
-          }
-          const releases = normalizeReleases(this.releases.get(plugin.id)?.data || [], {
-            platform: this.platform, arch: this.arch, repo: plugin.repo, includePrereleases: this.settings.includePrereleases,
-          });
-          const release = releases[0];
-          if (!release || !release.assets.some(a => a.compatible)) continue;
-
-          const supported = Object.keys(plugin.bundleNames).filter(f => f === 'VST3' || this.platform === 'darwin');
-          const formats = installed.length > 0
-            ? [...new Set(installed.map(i => i.format))]
-            : (supported.includes('VST3') ? ['VST3'] : supported.slice(0, 1));
-          if (!formats.length) continue;
-
           const groups = new Map();
           for (const format of formats) {
             const asset = selectAsset(release, format);
@@ -183,13 +183,13 @@ export class ManagerService {
           try {
             for (const [gIndex, { asset, formats: grpFormats }] of [...groups.values()].entries()) {
               const archivePath = path.join(temporary, `${gIndex}.zip`);
-              const basePct = Math.round((index / plugins.length) * 100);
-              this.progress(plugin.id, 'downloading', `Downloading ${plugin.name} (${index + 1} of ${plugins.length})`, basePct);
+              const basePct = Math.round((index / candidates.length) * 100);
+              this.progress(plugin.id, 'downloading', `Downloading ${plugin.name} (${index + 1} of ${candidates.length})`, basePct);
               await downloadAsset({
                 asset, repo: plugin.repo, destination: archivePath,
-                onProgress: percent => this.progress(plugin.id, 'downloading', `Downloading ${plugin.name} (${index + 1} of ${plugins.length})`, Math.round(basePct + (percent / plugins.length))),
+                onProgress: percent => this.progress(plugin.id, 'downloading', `Downloading ${plugin.name} (${index + 1} of ${candidates.length})`, Math.round(basePct + (percent / candidates.length))),
               });
-              this.progress(plugin.id, 'installing', `Installing ${plugin.name} (${index + 1} of ${plugins.length})`, Math.round(((index + 0.9) / plugins.length) * 100));
+              this.progress(plugin.id, 'installing', `Installing ${plugin.name} (${index + 1} of ${candidates.length})`, Math.round(((index + 0.9) / candidates.length) * 100));
               await this.installer.install({
                 plugin, tag: release.tag, archivePath, formats: grpFormats, digest: asset.digest, overwrite: Boolean(options.overwrite || installed.length > 0),
               });
@@ -200,7 +200,7 @@ export class ManagerService {
         } catch (error) {
           await this.log(`installAll (${plugin.id}): ${error.message}`).catch(() => {});
         }
-        this.progress(plugin.id, 'installing', `Installed ${plugin.name} (${index + 1} of ${plugins.length})`, Math.round(((index + 1) / plugins.length) * 100));
+        this.progress(plugin.id, 'installing', `Installed ${plugin.name} (${index + 1} of ${candidates.length})`, Math.round(((index + 1) / candidates.length) * 100));
       }
     });
   }

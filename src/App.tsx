@@ -16,6 +16,8 @@ const formatVersion = (tag: string) => tag.replace(/^v(?=\d)/, '');
 const errorMessage = (error: unknown) => error instanceof Error ? error.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : String(error);
 const platformName = (platform: string) => ({ darwin: 'macOS', win32: 'Windows', linux: 'Linux' })[platform] || platform;
 const isAvailable = (release?: PluginRelease) => Boolean(release?.assets.some(asset => asset.compatible));
+const latestAvailableRelease = (plugin: Plugin) => plugin.releases.find(isAvailable);
+const canInstallPlugin = (plugin: Plugin) => plugin.installed.length === 0 && Boolean(latestAvailableRelease(plugin));
 
 function Github({ size = 16 }: { size?: number }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 19c-4.3 1.3-4.3-2.2-6-2.7m12 5v-3.9c0-1.1-.4-1.9-.9-2.4 3-.3 6.1-1.5 6.1-6.9 0-1.5-.5-2.7-1.4-3.7.1-.4.6-1.8-.1-3.6 0 0-1.2-.4-3.8 1.4a13 13 0 0 0-6.8 0C5.5.4 4.3.8 4.3.8c-.7 1.8-.2 3.2-.1 3.6a5.4 5.4 0 0 0-1.4 3.7c0 5.4 3.1 6.6 6.1 6.9-.4.4-.8 1.1-.9 2.1v4.2" transform="translate(1 1) scale(.9)" /></svg>;
@@ -135,7 +137,7 @@ export function App() {
   const plugins = state?.plugins ?? [];
   const updateCount = plugins.filter(hasUpdate).length;
   const installedCount = plugins.filter(plugin => plugin.installed.length > 0).length;
-  const uninstalledCount = plugins.filter(plugin => isAvailable(plugin.releases[0]) && plugin.installed.length === 0).length;
+  const uninstalledCount = plugins.filter(canInstallPlugin).length;
   const isInstallingAll = busy?.id === 'all' && (busy?.action?.toLowerCase().includes('install') || progress?.phase === 'installing');
   const isUpdatingAll = busy?.id === 'all' && (busy?.action?.toLowerCase().includes('updat') || progress?.phase === 'updating');
   const isSingleBusy = busy !== null && busy.id !== 'all' && busy.id !== 'refresh' && busy.id !== 'settings';
@@ -153,7 +155,7 @@ export function App() {
   const navigate = (next: View) => { setView(next); setQuery(''); setCategory('All categories'); };
   const installAll = async () => {
     if (!manager) return;
-    const toInstall = plugins.filter(plugin => isAvailable(plugin.releases[0]) && plugin.installed.length === 0);
+    const toInstall = plugins.filter(canInstallPlugin);
     if (toInstall.length === 0) return;
     await operate('all', 'Installing all plugins', async () => {
       if (manager.installAll) {
@@ -161,8 +163,9 @@ export function App() {
       }
       let next = state!;
       for (const [index, plugin] of toInstall.entries()) {
+        const release = latestAvailableRelease(plugin);
         const formats: PluginFormat[] = plugin.formats.includes('VST3') ? ['VST3'] : plugin.formats.slice(0, 1);
-        if (formats.length && plugin.releases[0]) {
+        if (formats.length && release) {
           const basePct = Math.round((index / toInstall.length) * 100);
           setProgress({
             id: plugin.id,
@@ -170,7 +173,7 @@ export function App() {
             message: `Installing ${plugin.name} (${index + 1} of ${toInstall.length})`,
             percent: basePct,
           });
-          next = await manager.install({ id: plugin.id, tag: plugin.releases[0].tag, formats });
+          next = await manager.install({ id: plugin.id, tag: release.tag, formats });
           setProgress({
             id: plugin.id,
             phase: 'installing',
@@ -264,7 +267,7 @@ export function App() {
               {(state.offline || state.error) && <div className="connection-notice" role="status">{state.offline ? <WifiOff size={17} /> : <CircleAlert size={17} />}<span>{state.error || 'You’re offline. Showing your saved releases; reconnect to check for updates.'}</span></div>}
               {view === 'settings' ? <SettingsPanel key={JSON.stringify(state.settings)} state={state} manager={manager} busy={busy} save={settings => operate('settings', 'Saving settings', () => manager.saveSettings(settings), 'Settings saved.')} onError={message => setNotice({ kind: 'error', message })} openExternal={openExternal} operate={operate} />
                 : <>
-                  <section className="library-toolbar" aria-label="Filter plugins"><div className="search-field"><Search size={17} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search plugins" aria-label="Search plugins" />{query && <button className="icon-button clear-search" aria-label="Clear search" onClick={() => setQuery('')}><X size={14} /></button>}</div><div className="category-select"><SlidersHorizontal size={15} /><select aria-label="Category" value={category} onChange={event => setCategory(event.target.value)}><option>All categories</option>{categories.map(item => <option key={item}>{item}</option>)}</select><ChevronDown size={13} /></div><div className="toolbar-actions">{uninstalledCount > 0 && (view === 'library' || view === 'installed') && <button className="button button-primary install-all" disabled={Boolean(busy)} onClick={() => void installAll()}>{isInstallingAll ? <LoaderCircle size={15} className="spin" /> : <Download size={15} />}{isInstallingAll ? 'Installing all…' : 'Install all'}</button>}{updateCount > 0 && (view === 'updates' || view === 'installed' || view === 'library') && <button className={`button ${uninstalledCount > 0 && view === 'library' ? 'button-secondary' : 'button-primary'} update-all`} disabled={Boolean(busy)} onClick={() => void updateAll()}>{isUpdatingAll ? <LoaderCircle size={15} className="spin" /> : (uninstalledCount > 0 && view === 'library' ? <RefreshCw size={14} /> : <Download size={15} />)}{isUpdatingAll ? 'Updating all…' : 'Update all'}</button>}{installedCount > 0 && (view === 'installed' || view === 'updates') && <button className="button button-danger uninstall-all" disabled={Boolean(busy)} onClick={() => setConfirmUninstallAll(true)}><Trash2 size={15} />Uninstall all</button>}<span className="result-count">{visible.length} {visible.length === 1 ? 'plugin' : 'plugins'}</span></div></section>
+                  <section className="library-toolbar" aria-label="Filter plugins"><div className="search-field"><Search size={17} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search plugins" aria-label="Search plugins" />{query && <button className="icon-button clear-search" aria-label="Clear search" onClick={() => setQuery('')}><X size={14} /></button>}</div><div className="category-select"><SlidersHorizontal size={15} /><select aria-label="Category" value={category} onChange={event => setCategory(event.target.value)}><option>All categories</option>{categories.map(item => <option key={item}>{item}</option>)}</select><ChevronDown size={13} /></div><div className="toolbar-actions">{uninstalledCount > 0 && (view === 'library' || view === 'installed' || view === 'updates') && <button className="button button-primary install-all" disabled={Boolean(busy)} onClick={() => void installAll()}>{isInstallingAll ? <LoaderCircle size={15} className="spin" /> : <Download size={15} />}{isInstallingAll ? 'Installing all…' : 'Install all'}</button>}{updateCount > 0 && (view === 'updates' || view === 'installed' || view === 'library') && <button className={`button ${uninstalledCount > 0 && view === 'library' ? 'button-secondary' : 'button-primary'} update-all`} disabled={Boolean(busy)} onClick={() => void updateAll()}>{isUpdatingAll ? <LoaderCircle size={15} className="spin" /> : (uninstalledCount > 0 && view === 'library' ? <RefreshCw size={14} /> : <Download size={15} />)}{isUpdatingAll ? 'Updating all…' : 'Update all'}</button>}{installedCount > 0 && (view === 'installed' || view === 'updates') && <button className="button button-danger uninstall-all" disabled={Boolean(busy)} onClick={() => setConfirmUninstallAll(true)}><Trash2 size={15} />Uninstall all</button>}<span className="result-count">{visible.length} {visible.length === 1 ? 'plugin' : 'plugins'}</span></div></section>
                   {(busy?.id === 'all' || isSingleBusy) && <div className="active-progress-banner" role="status" aria-label="Operation progress"><div className="active-progress-header"><div className="active-progress-label"><LoaderCircle className="spin" size={15} /><span className="active-progress-message">{progress?.message || (busy?.action ? `${busy.action}…` : 'Processing…')}</span></div>{activePercent !== undefined && <span className="active-progress-percent">{activePercent}%</span>}</div><div className={`progress-track ${activePercent === undefined ? 'indeterminate' : ''}`} role="progressbar" aria-label="Operation progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={activePercent}><span style={activePercent === undefined ? undefined : { width: `${activePercent}%` }} /></div></div>}
                   {visible.length === 0 ? <div className="state-screen empty-state"><span className="state-symbol">{view === 'updates' && !query && category === 'All categories' ? <CheckCheck size={31} strokeWidth={1.5} /> : <AudioLines size={31} strokeWidth={1.5} />}</span><h2>{query || category !== 'All categories' ? 'No matching plugins' : view === 'installed' ? 'Your collection starts here' : view === 'updates' ? 'You’re up to date' : 'No plugins to show'}</h2><p>{query || category !== 'All categories' ? 'Try another search or choose a different category.' : view === 'installed' ? 'Choose a plugin from the library to install your first audio tool.' : view === 'updates' ? 'There are no newer releases for your installed plugins.' : 'Check for updates to load available releases.'}</p>{query || category !== 'All categories' ? <button className="button button-secondary" onClick={() => { setQuery(''); setCategory('All categories'); }}>Clear filters</button> : view === 'installed' ? <button className="button button-secondary" onClick={() => navigate('library')}>Browse library</button> : null}</div>
                     : <div className="library-layout"><section className="plugin-list" aria-label="Plugin library"><div className="list-heading"><span>Plugin</span><span>Version</span></div>{visible.map(plugin => <PluginRow key={plugin.id} plugin={plugin} selected={plugin.id === selected?.id} busy={busy} progress={progress} onSelect={() => setSelectedId(plugin.id)} />)}<p className="library-footnote">Rescan plugins in your DAW after installing.</p></section>{selected && <PluginDetail key={selected.id} plugin={selected} state={state} busy={busy} progress={progress} openExternal={openExternal} install={(tag, formats, options) => operate(selected.id, 'Installing', () => manager.install({ id: selected.id, tag, formats, ...options }), `${selected.name} installed.`)} uninstall={(formats, options) => operate(selected.id, 'Removing', () => manager.uninstall({ id: selected.id, formats, ...options }), `${selected.name} removed.`)} move={(formats, options) => operate(selected.id, 'Moving', () => manager.move ? manager.move({ id: selected.id, formats, ...options }) : manager.install({ id: selected.id, tag: selected.releases[0]?.tag ?? '', formats, ...options }), `${selected.name} moved.`)} />}</div>}
@@ -279,7 +282,7 @@ export function App() {
 function PluginRow({ plugin, selected, busy, progress, onSelect }: { plugin: Plugin; selected: boolean; busy: Busy; progress: Progress | null; onSelect: () => void }) {
   const update = hasUpdate(plugin);
   const installed = plugin.installed.length > 0;
-  const release = plugin.releases[0];
+  const release = latestAvailableRelease(plugin) ?? plugin.releases[0];
   const isWorking = busy?.id === plugin.id || (busy?.id === 'all' && progress?.id === plugin.id);
   const workingAction = busy?.id === plugin.id
     ? (busy.action === 'Installing' && update ? 'Updating…' : `${busy.action}…`)
@@ -299,7 +302,7 @@ function PluginDetail({ plugin, state, busy, progress, openExternal, install, un
   uninstall: (formats: PluginFormat[], options?: { unmanaged?: boolean }) => Promise<boolean>;
   move?: (formats: PluginFormat[], options?: { overwrite?: boolean }) => Promise<boolean>;
 }) {
-  const [tag, setTag] = useState(plugin.releases[0]?.tag ?? '');
+  const [tag, setTag] = useState((latestAvailableRelease(plugin) ?? plugin.releases[0])?.tag ?? '');
   const [formats, setFormats] = useState<PluginFormat[]>(() => {
     const detected = plugin.installed.map(item => item.format);
     if (detected.length) return [...new Set(detected)];
