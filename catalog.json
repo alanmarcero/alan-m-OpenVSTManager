@@ -54,6 +54,17 @@
     }
   },
   {
+    "id": "openClapper",
+    "repo": "openClapper",
+    "name": "openClapper",
+    "description": "An EDM & Trance clap synth with multi-burst flam, 12-note chromatic tuning, impact distortion, gated reverb, brickwall limiter, and DJ Clappy on stage.",
+    "category": "Instrument",
+    "bundleNames": {
+      "VST3": "openClapper.vst3",
+      "AU": "openClapper.component"
+    }
+  },
+  {
     "id": "openSausage",
     "repo": "openSausage",
     "name": "openSausage",
