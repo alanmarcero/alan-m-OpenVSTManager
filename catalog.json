@@ -54,6 +54,17 @@
     }
   },
   {
+    "id": "openFruit",
+    "repo": "openFruit",
+    "name": "openFruit",
+    "description": "A 16-track cyber sample tracker and step sequencer inspired by FL Studio, featuring sub-millisecond sonic tone analysis, 1/16-1/64 micro-timing, +/-24 semitone tuning, automatable A/B/C/D pages, and live in-mix auditioning.",
+    "category": "Instrument",
+    "bundleNames": {
+      "VST3": "openFruit.vst3",
+      "AU": "openFruit.component"
+    }
+  },
+  {
     "id": "openClapper",
     "repo": "openClapper",
     "name": "openClapper",
