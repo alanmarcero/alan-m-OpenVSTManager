@@ -1,6 +1,6 @@
 # OpenVST Manager
 
-A quiet home for Alan Marcero's audio plugins. Browse releases, install the formats you use, and keep your collection current.
+Desktop manager for Alan Marcero's audio plugins. Browse releases, install VST3 and AU formats, and keep plugins up to date.
 
 [Download for macOS or Windows](https://github.com/alanmarcero/alan-m-OpenVSTManager/releases/latest)
 
@@ -12,7 +12,7 @@ A quiet home for Alan Marcero's audio plugins. Browse releases, install the form
 - Switch between Light, Dark, and Cyberpunk from the main page.
 - Browse cached releases offline. No account, token, subscription, or background service.
 
-The catalog includes openEDMDelay, openWallLimiter, openDucker, openGlitchFX, openEDMFilter, openEDMKick, openClapper, openSausage, openTunerEQ, openMaster, Winamp Classic Equalizer, and Winamp Classic Visualizer. Each plugin links to its source and release notes. Download availability depends on its published releases and your platform.
+The catalog includes openEDMDelay, openWallLimiter, openDucker, openGlitchFX, openEDMFilter, openKicker, openClapper, openFruit, openSausage, openTunerEQ, openBassSpace, Winamp Classic Equalizer, and Winamp Classic Visualizer. Each plugin links to its source and release notes. Download availability depends on its published releases and your platform.
 
 <details>
 <summary>Dark and Cyberpunk previews</summary>
