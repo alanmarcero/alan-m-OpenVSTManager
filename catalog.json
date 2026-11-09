@@ -3,7 +3,7 @@
     "id": "openEDMDelay",
     "repo": "openEDMDelay",
     "name": "openEDMDelay",
-    "description": "A beat-synced eight-tap delay with ping-pong, digital, tape, BBD and lo-fi characters, selectable high/low-pass slopes, ducking and glitch effects.",
+    "description": "Beat-synced eight-tap delay with ping-pong, digital, tape, BBD and lo-fi modes, selectable high/low-pass slopes, ducking and glitch effects.",
     "category": "Delay",
     "bundleNames": {
       "VST3": "openEDMDelay.vst3",
@@ -14,7 +14,7 @@
     "id": "openWallLimiter",
     "repo": "openWallLimiter",
     "name": "openWallLimiter",
-    "description": "Five limiter characters, selectable high/low-pass filters, true-peak protection and loudness metering. Hold the line on your final mix.",
+    "description": "Five limiter characters with selectable high/low-pass filters, true-peak protection and LUFS loudness metering.",
     "category": "Mastering",
     "bundleNames": {
       "VST3": "openWallLimiter.vst3",
@@ -25,7 +25,7 @@
     "id": "openGlitchFX",
     "repo": "openGlitchFX",
     "name": "openGlitchFX",
-    "description": "A beat-synced playground for stutters, reversals and rhythmic disruption. Shape the unexpected across 32 steps.",
+    "description": "Beat-synced 32-step glitch sequencer for buffer stutters, reverse slices, tape stops, and pitch shifts.",
     "category": "Creative",
     "bundleNames": {
       "VST3": "openGlitchFX.vst3"
@@ -35,7 +35,7 @@
     "id": "openEDMFilter",
     "repo": "openEDMFilter",
     "name": "openEDMFilter",
-    "description": "Two expressive multimode filters with tempo-synced modulation, envelope followers and a little extra edge.",
+    "description": "Dual multimode filters with tempo-synced modulation, envelope followers, and analog-style drive.",
     "category": "Filter",
     "bundleNames": {
       "VST3": "openEDMFilter.vst3",
@@ -43,21 +43,27 @@
     }
   },
   {
-    "id": "openEDMKick",
+    "id": "openKicker",
     "repo": "openEDMKick",
-    "name": "openEDMKick",
-    "description": "A 12-note tuned kick drum synth with Locked-In WAV caching, Beat-4 synced reverse and bitcrush FX, A/B/C/D 1/64 auto builds, and Kick Mule on stage.",
+    "name": "openKicker",
+    "description": "12-note tuned kick drum synth with Locked-In WAV caching, Beat-4 synced reverse, bitcrush FX, and auto build patterns.",
     "category": "Instrument",
     "bundleNames": {
-      "VST3": "openEDMKick.vst3",
-      "AU": "openEDMKick.component"
+      "VST3": [
+        "openKicker.vst3",
+        "openEDMKick.vst3"
+      ],
+      "AU": [
+        "openKicker.component",
+        "openEDMKick.component"
+      ]
     }
   },
   {
     "id": "openFruit",
     "repo": "openFruit",
     "name": "openFruit",
-    "description": "A 16-track cyber sample tracker and step sequencer inspired by FL Studio, featuring sub-millisecond sonic tone analysis, 1/16-1/64 micro-timing, +/-24 semitone tuning, automatable A/B/C/D pages, and live in-mix auditioning.",
+    "description": "16-track sample tracker and step sequencer with pitch detection, 1/16-1/64 micro-timing, semitone tuning, and four-pattern pages.",
     "category": "Instrument",
     "bundleNames": {
       "VST3": "openFruit.vst3",
@@ -68,7 +74,7 @@
     "id": "openClapper",
     "repo": "openClapper",
     "name": "openClapper",
-    "description": "An EDM & Trance clap synth with multi-burst flam, 12-note chromatic tuning, impact distortion, gated reverb, brickwall limiter, and DJ Clappy on stage.",
+    "description": "EDM and Trance clap synth with multi-burst flam, 12-note chromatic tuning, impact distortion, gated reverb, and brickwall limiter.",
     "category": "Instrument",
     "bundleNames": {
       "VST3": "openClapper.vst3",
@@ -79,7 +85,7 @@
     "id": "openSausage",
     "repo": "openSausage",
     "name": "openSausage",
-    "description": "Saturation, reverb, rising pitch and stereo width. Four simple controls for sound with character.",
+    "description": "Four-knob saturation, reverb, pitch rise, and stereo width processor with selectable saturation algorithms.",
     "category": "Creative",
     "bundleNames": {
       "VST3": "openSausage.vst3",
@@ -90,7 +96,7 @@
     "id": "openDucker",
     "repo": "openDucker",
     "name": "openDucker",
-    "description": "One knob for host-synced rhythmic ducking. Four recovery slopes, six beat rates, and DJ Duck on the decks.",
+    "description": "Host-synced and free-running rhythmic ducking with four recovery curves, six beat rates, and audition trigger.",
     "category": "Dynamics",
     "bundleNames": {
       "VST3": "openDucker.vst3",
@@ -101,7 +107,7 @@
     "id": "openTunerEQ",
     "repo": "openTunerEQ",
     "name": "openTunerEQ",
-    "description": "A five-band musical equalizer. Tune by note, snap to the chromatic scale and shape frequencies at the piano.",
+    "description": "Five-band musical equalizer with note tuning, chromatic snapping, and interactive spectrum display.",
     "category": "Equalizer",
     "bundleNames": {
       "VST3": "openTunerEQ.vst3",
@@ -109,13 +115,14 @@
     }
   },
   {
-    "id": "openMaster",
+    "id": "openBassSpace",
     "repo": "openMaster",
-    "name": "openMaster",
-    "description": "Studio 84 mastering rack with filters, tone EQ, stereo shaping, compression, dynamic EQ, saturation, clipping, limiting, and loudness meters.",
+    "name": "openBassSpace",
+    "description": "Low frequency stereo width processor. Adjust frequency cutoff and width from mono to extra-wide.",
     "category": "Mastering",
     "bundleNames": {
       "VST3": [
+        "openBassSpace.vst3",
         "openMaster.vst3",
         "Analog Master Strip.vst3"
       ]
@@ -125,7 +132,7 @@
     "id": "winamp-classic-equalizer-vst",
     "repo": "winamp-classic-equalizer-vst",
     "name": "Winamp Classic Equalizer",
-    "description": "The familiar ten-band equalizer, reimagined as a plugin with 4Front EQ10 and Constant-Q modes.",
+    "description": "Ten-band equalizer plugin with 4Front EQ10 and Constant-Q modes.",
     "category": "Equalizer",
     "bundleNames": {
       "VST3": "Winamp Classic Equalizer.vst3"
@@ -136,7 +143,7 @@
     "id": "winamp-classic-visualizer-vst",
     "repo": "winamp-classic-visualizer-vst",
     "name": "Winamp Classic Visualizer",
-    "description": "A classic spectrum analyzer and oscilloscope for your session. Familiar movement, in a modern plugin.",
+    "description": "Classic spectrum analyzer and oscilloscope display plugin.",
     "category": "Analyzer",
     "bundleNames": {
       "VST3": "Winamp Classic Visualizer.vst3"
