@@ -46,7 +46,7 @@
     "id": "openEDMKick",
     "repo": "openEDMKick",
     "name": "openKicker",
-    "description": "12-note tuned kick drum synth with Locked-In WAV caching, Beat-4 synced reverse, bitcrush FX, and auto build patterns.",
+    "description": "12-note tuned kick drum synth with Simple and Advanced modes, Locked-In WAV caching, Beat-4 synced reverse, bitcrush FX, and auto build patterns.",
     "category": "Instrument",
     "bundleNames": {
       "VST3": [

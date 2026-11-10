@@ -8,7 +8,7 @@ export async function downloadAsset({asset,repo,destination,onProgress=()=>{},fe
   let response,url=asset.url;
   const signal=AbortSignal.timeout(5*60*1000);
   for(let redirects=0;redirects<6;redirects++){
-    response=await fetchImpl(url,{redirect:'manual',signal,headers:{'User-Agent':'OpenVSTManager/1.0.0'}});
+    response=await fetchImpl(url,{redirect:'manual',signal,headers:{'User-Agent':'OpenVSTManager/1.1.0'}});
     if(![301,302,303,307,308].includes(response.status))break;
     const target=new URL(response.headers.get('location'),url);
     if(target.protocol!=='https:' || target.port || target.username || target.password || !CDN_HOSTS.has(target.hostname))throw new Error('Refused an unsafe download redirect.');
