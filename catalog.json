@@ -82,6 +82,28 @@
     }
   },
   {
+    "id": "openSmacker",
+    "repo": "openSmacker",
+    "name": "openSmacker",
+    "description": "Tunable dance snare, bell, and tom-tom drum synthesizer with four voice models, 48 EDM and trance presets, FM overtone ring, gated reverb, and WAV lock-in.",
+    "category": "Instrument",
+    "bundleNames": {
+      "VST3": "openSmacker.vst3",
+      "AU": "openSmacker.component"
+    }
+  },
+  {
+    "id": "openHatter",
+    "repo": "openHatter",
+    "name": "openHatter",
+    "description": "Tunable off-beat open hi-hat synth for EDM and underground trance with 6-oscillator metallic matrix, air sizzle, reverse swell, and gated reverb.",
+    "category": "Instrument",
+    "bundleNames": {
+      "VST3": "openHatter.vst3",
+      "AU": "openHatter.component"
+    }
+  },
+  {
     "id": "openSausage",
     "repo": "openSausage",
     "name": "openSausage",
