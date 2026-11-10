@@ -15,7 +15,7 @@ try{
  const page=await app.firstWindow();
  const errors=[];page.on('pageerror',error=>errors.push(error.message));
  await page.getByRole('heading',{name:'Library',exact:true}).waitFor();
- await page.getByRole('button',{name:/openMaster Mastering/}).waitFor({timeout:90000});
+ await page.getByRole('button',{name:/open(Master|BassSpace) Mastering/}).waitFor({timeout:90000});
  await mkdir(path.join(root,'docs','screenshots'),{recursive:true});
  await page.screenshot({path:path.join(root,'docs','screenshots','library.png')});
  for(const theme of ['Dark','Cyberpunk']){
@@ -26,7 +26,7 @@ try{
    await page.screenshot({path:path.join(root,'docs','screenshots',theme.toLowerCase()+'.png'),animations:'disabled'});
  }
  await page.reload();
- await page.getByRole('button',{name:/openMaster Mastering/}).waitFor({timeout:90000});
+ await page.getByRole('button',{name:/open(Master|BassSpace) Mastering/}).waitFor({timeout:90000});
  assert.equal(await page.locator('html').getAttribute('data-theme'),'cyberpunk');
  await page.getByRole('button',{name:'Light',exact:true}).click();
  const initial=await page.evaluate(()=>window.manager.getState());
@@ -34,11 +34,11 @@ try{
  const {data:catalog}=await readJSON(path.join(temporary,'cache','catalog.json'),{data:bundledCatalog});
  assert.deepEqual(initial.plugins.map(plugin=>plugin.id).sort(),catalog.map(plugin=>plugin.id).sort());
  assert.equal(initial.settings.paths.VST3,pluginDir);
- await page.getByRole('textbox',{name:'Search plugins'}).fill('openMaster');
- await page.getByRole('button',{name:/openMaster Mastering/}).click();
+ await page.getByRole('textbox',{name:'Search plugins'}).fill('openBassSpace');
+ await page.getByRole('button',{name:/open(Master|BassSpace) Mastering/}).click();
  await page.getByLabel('Release',{exact:true}).selectOption('v1.0.0');
  await page.getByRole('button',{name:'Install plugin',exact:true}).click();
- await page.getByText('openMaster installed.',{exact:true}).waitFor({timeout:180000});
+ await page.getByText(/open(Master|BassSpace) installed\./).waitFor({timeout:180000});
 
  let state=await page.evaluate(()=>window.manager.getState());
  const installed=state.plugins.find(p=>p.id==='openMaster').installed;
@@ -60,7 +60,7 @@ try{
  await page.screenshot({path:path.join(root,'docs','screenshots','installed.png')});
  await page.getByRole('button',{name:/Remove/}).click();
  await page.getByRole('dialog').getByRole('button',{name:/Remove/}).click();
- await page.getByText('openMaster removed.',{exact:true}).waitFor({timeout:30000});
+ await page.getByText(/open(Master|BassSpace) removed\./).waitFor({timeout:30000});
  await assert.rejects(()=>access(updated[0].path));
  state=await page.evaluate(()=>window.manager.getState());assert.deepEqual(state.plugins.find(p=>p.id==='openMaster').installed,[]);
  assert.deepEqual(errors,[]);
