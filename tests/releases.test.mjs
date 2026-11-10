@@ -40,9 +40,19 @@ test('format-specific archives are preferred and do not mix AU with VST3',()=>{
 test('catalog rejects foreign repos, unsafe bundle paths and duplicate ids',()=>{
  const good={id:'openMaster',repo:'openMaster',name:'openMaster',description:'Mastering',category:'Mastering',bundleNames:{VST3:'openMaster.vst3'}};
  assert.equal(validateCatalog([good]).length,1);
+ assert.throws(()=>validateCatalog([{...good,id:'someone/id'}]),/id/);
  assert.throws(()=>validateCatalog([{...good,repo:'someone/repo'}]),/repository/);
  assert.throws(()=>validateCatalog([{...good,bundleNames:{VST3:'../outside.vst3'}}]),/bundle/);
  assert.throws(()=>validateCatalog([good,good]),/duplicate/);
+ const renamed={id:'openBassSpace',repo:'openMaster',name:'openBassSpace',description:'Mastering',category:'Mastering',bundleNames:{VST3:'openBassSpace.vst3'}};
+ assert.equal(validateCatalog([renamed]).length,1);
+});
+test('bundled catalog.json is valid', async () => {
+ const { readFile } = await import('node:fs/promises');
+ const raw = await readFile(new URL('../catalog.json', import.meta.url), 'utf8');
+ const catalog = JSON.parse(raw);
+ const validated = validateCatalog(catalog);
+ assert.ok(validated.length >= 10);
 });
 test('catalog supports explicit historical bundle aliases but still rejects unsafe names',()=>{
  const plugin={id:'openMaster',repo:'openMaster',name:'Master',description:'Master',category:'Mastering',bundleNames:{VST3:['openMaster.vst3','Analog Master Strip.vst3']}};

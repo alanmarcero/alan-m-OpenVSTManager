@@ -43,7 +43,7 @@
     }
   },
   {
-    "id": "openKicker",
+    "id": "openEDMKick",
     "repo": "openEDMKick",
     "name": "openKicker",
     "description": "12-note tuned kick drum synth with Locked-In WAV caching, Beat-4 synced reverse, bitcrush FX, and auto build patterns.",
@@ -115,7 +115,7 @@
     }
   },
   {
-    "id": "openBassSpace",
+    "id": "openMaster",
     "repo": "openMaster",
     "name": "openBassSpace",
     "description": "Low frequency stereo width processor. Adjust frequency cutoff and width from mono to extra-wide.",

@@ -49,7 +49,8 @@ export function validateCatalog(value) {
   if (!Array.isArray(value) || value.length === 0 || value.length > 100) throw new Error('Invalid plugin catalog.');
   const ids = new Set();
   return value.map(p => {
-    if (!p || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/.test(p.repo) || p.repo.includes('..') || p.id !== p.repo) throw new Error('Invalid catalog repository.');
+    if (!p || typeof p.id !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/.test(p.id) || p.id.includes('..')) throw new Error('Invalid catalog id.');
+    if (typeof p.repo !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/.test(p.repo) || p.repo.includes('..')) throw new Error('Invalid catalog repository.');
     if (ids.has(p.id)) throw new Error('Invalid catalog: duplicate plugin.');
     ids.add(p.id);
     for (const key of ['name','description','category']) if (typeof p[key] !== 'string' || p[key].length > 1000) throw new Error(`Invalid catalog ${key}.`);
