@@ -13,6 +13,7 @@ protocol.registerSchemesAsPrivileged([{scheme:'openvst',privileges:{standard:tru
 if(process.env.OPENVST_DATA_DIR)app.setPath('userData',path.resolve(process.env.OPENVST_DATA_DIR));
 if(!app.requestSingleInstanceLock())app.quit();
 else {
+  app.disableHardwareAcceleration();
   let window;
   app.on('second-instance',()=>{if(window){if(window.isMinimized())window.restore();window.focus();}});
   app.whenReady().then(async()=>{
@@ -59,13 +60,12 @@ else {
     return handler(...args);
   });
   function createWindow(){
-    window=new BrowserWindow({width:1220,height:820,minWidth:860,minHeight:620,title:'OpenVST Manager',backgroundColor:'#f4f6f7',show:false,
+    window=new BrowserWindow({width:1220,height:820,minWidth:860,minHeight:620,title:'OpenVST Manager',backgroundColor:'#f4f6f7',show:true,
       icon:path.join(root,'assets','icon.png'),
       webPreferences:{preload:path.join(root,'electron','preload.cjs'),nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true}});
     window.webContents.setWindowOpenHandler(()=>({action:'deny'}));
     window.webContents.on('will-navigate',event=>event.preventDefault());
     window.on('close',event=>{if(manager.busy){event.preventDefault();dialog.showMessageBox(window,{type:'info',message:'An installation is still running.',detail:'Wait for it to finish before closing OpenVST Manager.'});}});
-    window.once('ready-to-show',()=>window.show());
     window.loadURL(origin+'/index.html');
   }
   Menu.setApplicationMenu(Menu.buildFromTemplate([
