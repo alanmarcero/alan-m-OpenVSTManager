@@ -11,7 +11,7 @@ export class GitHubClient {
     const cached=await readJSON(file,null).catch(()=>null);
     if(cached && !force && Date.now()-cached.fetchedAt<TTL) return {...cached,stale:false};
     try {
-      const headers={Accept:'application/vnd.github+json','User-Agent':'OpenVSTManager/0.1.0'};
+      const headers={Accept:'application/vnd.github+json','User-Agent':'OpenVSTManager/1.0.0'};
       if(cached?.etag)headers['If-None-Match']=cached.etag;
       const response=await this.fetch(url,{headers,signal:AbortSignal.timeout(20_000),redirect:'error'});
       let data;

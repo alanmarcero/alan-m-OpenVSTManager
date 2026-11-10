@@ -9,7 +9,7 @@ async function setup(t){
  const dataDir=await mkdtemp(path.join(tmpdir(),'openvst-service-'));t.after(()=>rm(dataDir,{recursive:true,force:true}));
  const client={catalog:async()=>({data:[plugin],stale:false}),releases:async()=>({data:[],stale:false,fetchedAt:12345})};
  const installer={paths:{VST3:'/tmp/plugins'},setPaths(paths){this.paths={...this.paths,...paths};},detect:async()=>[]};
- return {service:new ManagerService({dataDir,client,installer,platform:'darwin',arch:'arm64',appVersion:'0.1.0',bundledCatalog:[plugin]}),dataDir,client};
+ return {service:new ManagerService({dataDir,client,installer,platform:'darwin',arch:'arm64',appVersion:'1.0.0',bundledCatalog:[plugin]}),dataDir,client};
 }
 test('state distinguishes no published release from a failed refresh',async t=>{
  const {service,client}=await setup(t);
