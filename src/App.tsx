@@ -26,11 +26,12 @@ function Github({ size = 16 }: { size?: number }) {
 function needsUpdate(installation: InstalledPlugin, release?: PluginRelease): boolean {
   const current = valid(installation.version);
   const latest = release && valid(release.tag);
-  return Boolean(installation.managed && isAvailable(release) && current && latest && gt(latest, current));
+  return Boolean(isAvailable(release) && current && latest && gt(latest, current));
 }
 
 function hasUpdate(plugin: Plugin): boolean {
-  return plugin.installed.some(installation => needsUpdate(installation, plugin.releases[0]));
+  const release = latestAvailableRelease(plugin);
+  return plugin.installed.some(installation => needsUpdate(installation, release));
 }
 
 function checkedTime(value: ManagerState['lastChecked']) {
@@ -196,8 +197,10 @@ export function App() {
       }
       let next = state!;
       for (const [index, plugin] of updates.entries()) {
-        const formats = plugin.installed.filter(item => needsUpdate(item, plugin.releases[0])).map(item => item.format);
-        if (formats.length) {
+        const release = latestAvailableRelease(plugin) ?? plugin.releases[0];
+        const formats = plugin.installed.filter(item => needsUpdate(item, release)).map(item => item.format);
+        const hasUnmanaged = formats.some(f => plugin.installed.some(i => i.format === f && !i.managed));
+        if (formats.length && release) {
           const basePct = Math.round((index / updates.length) * 100);
           setProgress({
             id: plugin.id,
@@ -205,7 +208,7 @@ export function App() {
             message: `Updating ${plugin.name} (${index + 1} of ${updates.length})`,
             percent: basePct,
           });
-          next = await manager.install({ id: plugin.id, tag: plugin.releases[0].tag, formats });
+          next = await manager.install({ id: plugin.id, tag: release.tag, formats, ...(hasUnmanaged ? { overwrite: true } : {}) });
           setProgress({
             id: plugin.id,
             phase: 'updating',
@@ -365,8 +368,8 @@ function PluginDetail({ plugin, state, busy, progress, openExternal, install, un
   const percent = progress?.id === plugin.id && typeof progress.percent === 'number' ? Math.min(100, Math.max(0, progress.percent)) : undefined;
 
   const action = hasUnmanaged
-    ? 'Replace with managed copy'
-    : managed.length && release?.tag === plugin.releases[0]?.tag && hasUpdate(plugin)
+    ? (hasUpdate(plugin) && release?.tag === latestAvailableRelease(plugin)?.tag ? 'Update plugin' : 'Replace with managed copy')
+    : managed.length && release?.tag === latestAvailableRelease(plugin)?.tag && hasUpdate(plugin)
       ? 'Update plugin'
       : hasOldLocation
         ? 'Move to new folder'

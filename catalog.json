@@ -48,6 +48,9 @@
     "name": "openKicker",
     "description": "12-note tuned kick drum synth with Simple and Advanced modes, Locked-In WAV caching, Beat-4 synced reverse, bitcrush FX, and auto build patterns.",
     "category": "Instrument",
+    "aliases": [
+      "openKicker"
+    ],
     "bundleNames": {
       "VST3": [
         "openKicker.vst3",
@@ -142,6 +145,9 @@
     "name": "openBassSpace",
     "description": "Low frequency stereo width processor. Adjust frequency cutoff and width from mono to extra-wide.",
     "category": "Mastering",
+    "aliases": [
+      "openMaster"
+    ],
     "bundleNames": {
       "VST3": [
         "openBassSpace.vst3",

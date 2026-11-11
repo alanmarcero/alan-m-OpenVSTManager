@@ -305,13 +305,13 @@ export class ManagerService {
           const releases = normalizeReleases(this.releases.get(plugin.id)?.data || [], {
             platform: this.platform, arch: this.arch, repo: plugin.repo, includePrereleases: this.settings.includePrereleases,
           });
-          const release = releases[0];
-          if (!release || !release.assets.some(a => a.compatible)) continue;
+          const release = releases.find(r => r.assets.some(a => a.compatible));
+          if (!release) continue;
 
           const formatsToUpdate = installed.filter(item => {
             const current = semver.valid(item.version);
             const latest = semver.valid(release.tag);
-            return Boolean(item.managed && current && latest && semver.gt(latest, current));
+            return Boolean(current && latest && semver.gt(latest, current));
           }).map(item => item.format);
 
           if (!formatsToUpdate.length) continue;
