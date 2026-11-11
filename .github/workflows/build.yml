@@ -21,6 +21,11 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
+      - name: Harden DNS and mirrors for apt
+        run: |
+          echo "nameserver 8.8.8.8" | sudo tee /etc/resolv.conf > /dev/null
+          echo 'Acquire::ForceIPv4 "true";' | sudo tee /etc/apt/apt.conf.d/99force-ipv4
+          sudo grep -rl "azure.archive.ubuntu.com" /etc/apt/ 2>/dev/null | xargs -r sudo sed -i 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g'
       - run: npx playwright install --with-deps chromium
       - run: npm run test:ui
   package:
