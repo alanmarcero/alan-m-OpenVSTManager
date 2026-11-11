@@ -48,7 +48,28 @@ export interface PathOption {
 
 export interface Settings {
   includePrereleases: boolean;
+  autoCheckAppUpdates: boolean;
   paths: Record<PluginFormat, string>;
+  backupFolder: string;
+  preferredFormats: PluginFormat[];
+  githubToken: string;
+}
+
+export interface AppUpdateInfo {
+  available: boolean;
+  currentVersion: string;
+  latestVersion: string;
+  tag?: string;
+  releaseName?: string;
+  publishedAt?: string;
+  notes?: string;
+  url?: string;
+  asset?: {
+    name: string;
+    url: string;
+    size: number;
+  };
+  error?: string;
 }
 
 export interface ManagerState {
@@ -58,6 +79,9 @@ export interface ManagerState {
   plugins: Plugin[];
   settings: Settings;
   pathOptions?: Partial<Record<PluginFormat, PathOption[]>>;
+  defaultPaths?: Partial<Record<PluginFormat, string>>;
+  defaultBackupFolder?: string;
+  appUpdate?: AppUpdateInfo | null;
   lastChecked: string | number | null;
   offline: boolean;
   error?: string;
@@ -80,8 +104,11 @@ export interface ManagerAPI {
   updateAll?(options?: { overwrite?: boolean }): Promise<ManagerState>;
   move?(options: { id: string; formats: PluginFormat[]; overwrite?: boolean }): Promise<ManagerState>;
   moveAll?(): Promise<ManagerState>;
-  saveSettings(settings: { includePrereleases?: boolean; paths?: Partial<Record<PluginFormat, string>> }): Promise<ManagerState>;
+  saveSettings(settings: Partial<Settings>): Promise<ManagerState>;
   chooseDirectory(format: PluginFormat): Promise<string | null>;
+  chooseBackupDirectory?(): Promise<string | null>;
+  checkAppUpdate?(): Promise<AppUpdateInfo>;
+  installAppUpdate?(): Promise<{ success: boolean; installerPath?: string }>;
   openExternal(url: string): Promise<void>;
   onProgress(callback: (progress: Progress) => void): () => void;
 }

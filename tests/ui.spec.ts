@@ -18,7 +18,14 @@ declare global {
 const initialState: ManagerState = {
   platform: 'darwin', arch: 'arm64', appVersion: '0.1.0',
   lastChecked: '2026-10-21T12:00:00Z', offline: false,
-  settings: { includePrereleases: false, paths: { VST3: '/tmp/openvst-test/VST3', AU: '/tmp/openvst-test/Components' } },
+  settings: {
+    includePrereleases: false,
+    autoCheckAppUpdates: true,
+    paths: { VST3: '/tmp/openvst-test/VST3', AU: '/tmp/openvst-test/Components' },
+    backupFolder: '/tmp/openvst-test/backups',
+    preferredFormats: ['VST3', 'AU'],
+    githubToken: '',
+  },
   pathOptions: {
     VST3: [{ label: 'User folder', path: '/tmp/openvst-test/VST3' }, { label: 'System folder', path: '/Library/Audio/Plug-Ins/VST3' }],
     AU: [{ label: 'User folder', path: '/tmp/openvst-test/Components' }, { label: 'System folder', path: '/Library/Audio/Plug-Ins/Components' }],

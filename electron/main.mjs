@@ -43,10 +43,23 @@ else {
     uninstallAll:options=>manager.uninstallAll(options),
     move:request=>manager.move(request),moveAll:()=>manager.moveAll(),
     saveSettings:patch=>manager.saveSettings(patch),
+    checkAppUpdate:()=>manager.checkAppUpdate({force:true}),
+    installAppUpdate:async()=>{
+      const result=await manager.installAppUpdate();
+      if(result?.success && process.platform==='win32'){
+        setTimeout(()=>app.quit(), 800);
+      }
+      return result;
+    },
     chooseDirectory:async format=>{
       if(!['VST3','AU'].includes(format))throw new Error('Unknown plugin format.');
       const state=await manager.getState();
       const result=await dialog.showOpenDialog(window,{title:`Choose ${format} folder`,defaultPath:state.settings.paths[format],properties:['openDirectory','createDirectory']});
+      return result.canceled?null:result.filePaths[0];
+    },
+    chooseBackupDirectory:async()=>{
+      const state=await manager.getState();
+      const result=await dialog.showOpenDialog(window,{title:'Choose Backups folder',defaultPath:state.settings.backupFolder,properties:['openDirectory','createDirectory']});
       return result.canceled?null:result.filePaths[0];
     },
     openExternal:async value=>{
