@@ -114,13 +114,22 @@ export class Installer {
   #pending = Promise.resolve();
   #recovering = null;
   #plugins = new Map();
-  constructor({ dataDir, paths = {}, platform = process.platform, home = homedir(), plugins = [] }) {
+  constructor({ dataDir, paths = {}, backupFolder = null, platform = process.platform, home = homedir(), plugins = [] }) {
     if (!dataDir || !path.isAbsolute(dataDir)) throw new Error('Installer data directory must be absolute');
     this.dataDir = path.resolve(dataDir);
     this.platform = platform;
     this.paths = defaultPaths({ platform, home });
     this.setPaths(paths);
+    this.setBackupFolder(backupFolder);
     for (const plugin of plugins) { validatePlugin(plugin); this.#plugins.set(plugin.id, plugin); }
+  }
+
+  setBackupFolder(backupFolder) {
+    if (backupFolder && typeof backupFolder === 'string') {
+      this.backupFolder = path.resolve(backupFolder);
+    } else {
+      this.backupFolder = path.join(this.dataDir, 'backups');
+    }
   }
 
   setPaths(paths) {
@@ -522,6 +531,17 @@ export class Installer {
         }
       }
       await this.#writeState('receipts.json', next);
+      if (this.backupFolder) {
+        for (const change of journal.changes) {
+          if (change.backup && await exists(change.backup)) {
+            try {
+              const archiveDir = path.join(this.backupFolder, `${change.previous.pluginId}-${change.previous.version || 'backup'}`);
+              await fs.mkdir(archiveDir, { recursive: true });
+              await fs.cp(change.backup, path.join(archiveDir, change.previous.bundleName), { recursive: true, force: true });
+            } catch { /* Backups to external folder are best-effort */ }
+          }
+        }
+      }
       await this.#recoverJournal(journal);
     } catch (error) {
       if (journalWritten) {

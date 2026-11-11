@@ -2,11 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { gt, valid } from 'semver';
 import {
   ArrowDownToLine, ArrowUpRight, AudioLines, Check, CheckCheck, ChevronDown,
-  ChevronRight, CircleAlert, CircleCheck, Download, ExternalLink, Folder,
-  Library, LoaderCircle, Monitor, Moon, RefreshCw, Search, Settings2, SlidersHorizontal,
-  Sun, Trash2, WifiOff, X, Zap,
+  ChevronRight, CircleAlert, CircleCheck, Download, ExternalLink, Eye, EyeOff, Folder,
+  Library, LoaderCircle, Monitor, Moon, RefreshCw, RotateCcw, Search, Settings2, SlidersHorizontal,
+  Sparkles, Sun, Trash2, WifiOff, X, Zap,
 } from 'lucide-react';
-import type { InstalledPlugin, ManagerAPI, ManagerState, PathOption, Plugin, PluginFormat, PluginRelease, Progress, Settings } from './types';
+import type { AppUpdateInfo, InstalledPlugin, ManagerAPI, ManagerState, PathOption, Plugin, PluginFormat, PluginRelease, Progress, Settings } from './types';
 
 type View = 'library' | 'installed' | 'updates' | 'settings';
 type Busy = { id: string; action: string } | null;
@@ -79,6 +79,7 @@ export function App() {
   const [progress, setProgress] = useState<Progress | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
   const [confirmUninstallAll, setConfirmUninstallAll] = useState(false);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -257,7 +258,24 @@ export function App() {
       <header className="page-header">
         <div className="header-copy"><h1>{viewTitle}</h1><p>{view === 'settings' ? 'Plugin folders and release preferences.' : view === 'installed' ? 'Plugins on this computer.' : view === 'updates' ? 'New releases for installed plugins.' : 'Audio tools by Alan Marcero.'}</p></div>
         {view !== 'settings' && <img className="header-art" src={theme === 'cyberpunk' ? './artwork/cyberpunk-signal.png' : './artwork/signal-sculpture.png'} alt="" />}
-        <div className="header-actions"><div className="theme-toggle" role="group" aria-label="Appearance"><button aria-pressed={theme === 'light'} onClick={() => setTheme('light')}><Sun size={13} />Light</button><button aria-pressed={theme === 'dark'} onClick={() => setTheme('dark')}><Moon size={13} />Dark</button><button aria-pressed={theme === 'cyberpunk'} onClick={() => setTheme('cyberpunk')}><Zap size={13} />Cyberpunk</button></div>{state && view !== 'settings' && <><button className="button button-quiet refresh-button" disabled={Boolean(busy)} onClick={() => void operate('refresh', 'Checking releases', () => manager!.refresh())}><RefreshCw size={15} className={busy?.id === 'refresh' ? 'spin' : ''} />Check for updates</button><span className="last-checked">{state.offline ? 'Offline · saved releases' : checkedTime(state.lastChecked)}</span></>}</div>
+        <div className="header-actions">
+          <div className="theme-toggle" role="group" aria-label="Appearance">
+            <button aria-pressed={theme === 'light'} onClick={() => setTheme('light')}><Sun size={13} />Light</button>
+            <button aria-pressed={theme === 'dark'} onClick={() => setTheme('dark')}><Moon size={13} />Dark</button>
+            <button aria-pressed={theme === 'cyberpunk'} onClick={() => setTheme('cyberpunk')}><Zap size={13} />Cyberpunk</button>
+          </div>
+          {state?.appUpdate?.available && (
+            <button className="button button-update" onClick={() => setShowUpdateModal(true)}>
+              <Sparkles size={14} />Update to v{state.appUpdate.latestVersion}
+            </button>
+          )}
+          {state && view !== 'settings' && <>
+            <button className="button button-quiet refresh-button" disabled={Boolean(busy)} onClick={() => void operate('refresh', 'Checking releases', () => manager!.refresh())}>
+              <RefreshCw size={15} className={busy?.id === 'refresh' ? 'spin' : ''} />Check for updates
+            </button>
+            <span className="last-checked">{state.offline ? 'Offline · saved releases' : checkedTime(state.lastChecked)}</span>
+          </>}
+        </div>
       </header>
 
       {!manager ? <div className="state-screen"><span className="state-symbol"><Monitor size={31} strokeWidth={1.5} /></span><h2>Made for your desktop</h2><p>OpenVST Manager installs audio plugins on your computer. Open the desktop app to browse releases and manage your collection.</p><span className="state-footnote">Available for macOS and Windows. Build from source on Linux.</span></div>
@@ -275,6 +293,21 @@ export function App() {
             </>}
     </main>
     {confirmUninstallAll && <ConfirmDialog title="Uninstall all plugins?" description={`This removes all ${installedCount} installed plugin${installedCount === 1 ? '' : 's'} from your computer.`} cancelLabel="Keep plugins" actionLabel="Uninstall all" danger={true} busy={Boolean(busy)} onCancel={() => setConfirmUninstallAll(false)} onConfirm={async () => { await uninstallAll(); setConfirmUninstallAll(false); }} />}
+    {showUpdateModal && state?.appUpdate?.available && (
+      <UpdateModal
+        update={state.appUpdate}
+        busy={busy}
+        progress={progress}
+        onClose={() => setShowUpdateModal(false)}
+        onInstall={async () => {
+          if (!manager?.installAppUpdate) return;
+          await operate('manager-update', 'Updating manager', async () => {
+            await manager.installAppUpdate!();
+            return state;
+          }, 'Update installer launched. Exiting to complete installation…');
+        }}
+      />
+    )}
     {notice && <div className={`toast toast-${notice.kind}`} role={notice.kind === 'error' ? 'alert' : 'status'}>{notice.kind === 'error' ? <CircleAlert size={18} /> : <CircleCheck size={18} />}<span>{notice.message}</span><button className="icon-button" aria-label="Dismiss notification" onClick={() => setNotice(null)}><X size={16} /></button></div>}
   </div>;
 }
@@ -306,6 +339,9 @@ function PluginDetail({ plugin, state, busy, progress, openExternal, install, un
   const [formats, setFormats] = useState<PluginFormat[]>(() => {
     const detected = plugin.installed.map(item => item.format);
     if (detected.length) return [...new Set(detected)];
+    const preferred = state.settings.preferredFormats || ['VST3'];
+    const candidates = plugin.formats.filter(f => preferred.includes(f));
+    if (candidates.length) return candidates;
     return plugin.formats.includes('VST3') ? ['VST3'] : plugin.formats.slice(0, 1);
   });
   const [confirmRemove, setConfirmRemove] = useState(false);
@@ -410,6 +446,58 @@ function ConfirmDialog({ title, description, busy, actionLabel = 'Remove plugin'
   return <dialog ref={ref} className="confirm-dialog" onCancel={event => { event.preventDefault(); if (!busy) onCancel(); }} onClick={event => { if (event.target === event.currentTarget && !busy) onCancel(); }} aria-labelledby="confirm-title" aria-describedby="confirm-description"><div className="dialog-content"><span className="dialog-icon">{danger ? <Trash2 size={22} strokeWidth={1.5} /> : <Download size={22} strokeWidth={1.5} />}</span><h2 id="confirm-title">{title}</h2><p id="confirm-description">{description}</p><div className="dialog-actions"><button autoFocus className="button button-secondary" disabled={busy} onClick={onCancel}>{cancelLabel}</button><button className={`button ${danger ? 'button-danger' : 'button-primary'}`} disabled={busy} onClick={() => void onConfirm()}>{busy ? <LoaderCircle size={14} className="spin" /> : danger ? <Trash2 size={14} /> : <Download size={14} />}{busy ? 'Working…' : actionLabel}</button></div></div></dialog>;
 }
 
+function UpdateModal({
+  update,
+  busy,
+  progress,
+  onClose,
+  onInstall,
+}: {
+  update: AppUpdateInfo;
+  busy: Busy;
+  progress: Progress | null;
+  onClose: () => void;
+  onInstall: () => Promise<void>;
+}) {
+  const isUpdating = busy?.id === 'manager-update' || progress?.phase?.includes('update');
+  const percent = typeof progress?.percent === 'number' ? progress.percent : undefined;
+
+  return (
+    <dialog open className="confirm-dialog update-dialog" aria-labelledby="update-title">
+      <div className="dialog-content">
+        <span className="dialog-icon update-dialog-icon"><Sparkles size={22} strokeWidth={1.5} /></span>
+        <h2 id="update-title">Update OpenVST Manager</h2>
+        <p className="update-version-tag">
+          Version {update.latestVersion} is available (current: {update.currentVersion}).
+        </p>
+        {update.notes ? (
+          <div className="update-notes-box">
+            <h3>Release notes</h3>
+            <pre>{update.notes}</pre>
+          </div>
+        ) : null}
+        {isUpdating && (
+          <div className="install-progress" role="status" style={{ marginTop: '14px' }}>
+            <div className={`progress-track ${percent === undefined ? 'indeterminate' : ''}`}>
+              <span style={percent === undefined ? undefined : { width: `${percent}%` }} />
+            </div>
+            <p>{progress?.message || 'Downloading update…'}</p>
+          </div>
+        )}
+        <div className="dialog-actions">
+          <button className="button button-secondary" disabled={Boolean(isUpdating)} onClick={onClose}>
+            Later
+          </button>
+          <button className="button button-primary" disabled={Boolean(isUpdating)} onClick={() => void onInstall()}>
+            {isUpdating ? <LoaderCircle size={14} className="spin" /> : <Download size={14} />}
+            {isUpdating ? 'Updating…' : 'Install and restart'}
+          </button>
+        </div>
+      </div>
+    </dialog>
+  );
+}
+
 function SettingsPanel({ state, manager, busy, save, onError, openExternal, operate }: {
   state: ManagerState; manager: ManagerAPI; busy: Busy;
   save: (settings: Settings) => Promise<boolean>;
@@ -422,6 +510,7 @@ function SettingsPanel({ state, manager, busy, save, onError, openExternal, oper
     if (state.platform === 'win32') return trimmed.replace(/[\\/]+/g, '\\').replace(/\\$/, '').toLowerCase();
     return trimmed.replace(/\/+$/, '');
   };
+
   const getOptions = (format: PluginFormat): PathOption[] => {
     if (state.pathOptions?.[format]?.length) return state.pathOptions[format]!;
     if (state.platform === 'win32') {
@@ -442,14 +531,33 @@ function SettingsPanel({ state, manager, busy, save, onError, openExternal, oper
       { label: 'System folder (/usr/lib/vst3)', path: '/usr/lib/vst3' },
     ];
   };
-  const [draft, setDraft] = useState<Settings>(state.settings);
-  const [choosing, setChoosing] = useState(false);
-  const changed = JSON.stringify(draft) !== JSON.stringify(state.settings);
-  const formats: PluginFormat[] = state.platform === 'darwin' ? ['VST3', 'AU'] : ['VST3'];
 
-  const oldLocationCount = state.plugins.filter(plugin =>
-    plugin.installed.some(item => item.managed && item.locationMismatch)
-  ).length;
+  const [draft, setDraft] = useState<Settings>(() => ({
+    includePrereleases: state.settings.includePrereleases ?? false,
+    autoCheckAppUpdates: state.settings.autoCheckAppUpdates ?? true,
+    paths: { ...state.settings.paths },
+    backupFolder: state.settings.backupFolder || state.defaultBackupFolder || '',
+    preferredFormats: Array.isArray(state.settings.preferredFormats) ? [...state.settings.preferredFormats] : (state.platform === 'darwin' ? ['VST3', 'AU'] : ['VST3']),
+    githubToken: state.settings.githubToken || '',
+  }));
+
+  const [choosing, setChoosing] = useState(false);
+  const [showToken, setShowToken] = useState(false);
+  const [checkingUpdates, setCheckingUpdates] = useState(false);
+  const formats: PluginFormat[] = state.platform === 'darwin' ? ['VST3', 'AU'] : ['VST3'];
+  const changed =
+    draft.includePrereleases !== (state.settings.includePrereleases ?? false) ||
+    draft.autoCheckAppUpdates !== (state.settings.autoCheckAppUpdates ?? true) ||
+    (draft.backupFolder || '') !== (state.settings.backupFolder || state.defaultBackupFolder || '') ||
+    (draft.githubToken || '') !== (state.settings.githubToken || '') ||
+    JSON.stringify(draft.preferredFormats) !== JSON.stringify(state.settings.preferredFormats ?? (state.platform === 'darwin' ? ['VST3', 'AU'] : ['VST3'])) ||
+    formats.some(format => (draft.paths[format] || '') !== (state.settings.paths?.[format] || ''));
+
+  const strayInstalls = state.plugins.flatMap(plugin =>
+    plugin.installed
+      .filter(item => item.managed && item.locationMismatch)
+      .map(item => ({ plugin, item }))
+  );
 
   const handleMoveAll = async () => {
     if (!manager.moveAll) return;
@@ -458,15 +566,398 @@ function SettingsPanel({ state, manager, busy, save, onError, openExternal, oper
 
   const choose = async (format: PluginFormat) => {
     setChoosing(true);
-    try { const path = await manager.chooseDirectory(format); if (path) setDraft(current => ({ ...current, paths: { ...current.paths, [format]: path } })); }
-    catch (error) { onError(errorMessage(error)); }
-    finally { setChoosing(false); }
+    try {
+      const path = await manager.chooseDirectory(format);
+      if (path) setDraft(current => ({ ...current, paths: { ...current.paths, [format]: path } }));
+    } catch (error) {
+      onError(errorMessage(error));
+    } finally {
+      setChoosing(false);
+    }
   };
-  return <div className="settings-panel"><section className="settings-section"><h2>Installation folders</h2><p>New plugins install here. Existing installations move here when you next install or update them.</p>{formats.map(format => {
-    const options = getOptions(format);
-    const currentPath = draft.paths[format] || '';
-    const matchingOption = options.find(opt => normalize(opt.path) === normalize(currentPath));
-    const selectValue = matchingOption ? matchingOption.path : '__custom__';
-    return <div className="path-setting" key={format}><label htmlFor={`path-select-${format}`}>{format === 'AU' ? 'Audio Units' : 'VST3'}</label><div className="path-preset-select"><select id={`path-select-${format}`} aria-label={`${format === 'AU' ? 'Audio Units' : 'VST3'} location`} value={selectValue} onChange={event => { const next = event.target.value; if (next !== '__custom__') setDraft(current => ({ ...current, paths: { ...current.paths, [format]: next } })); }} disabled={Boolean(busy) || choosing}>{options.map(option => <option key={option.path} value={option.path}>{option.label} ({option.path})</option>)}<option value="__custom__">Custom folder…</option></select><ChevronDown size={14} /></div><div className="path-control"><Folder size={17} /><input id={`path-${format}`} aria-label={`${format === 'AU' ? 'Audio Units' : 'VST3'} path`} value={draft.paths[format]} onChange={event => setDraft(current => ({ ...current, paths: { ...current.paths, [format]: event.target.value } }))} spellCheck={false} autoComplete="off" disabled={Boolean(busy) || choosing} /><button className="button button-secondary" onClick={() => void choose(format)} disabled={Boolean(busy) || choosing}>Choose folder</button></div></div>;
-  })}{oldLocationCount > 0 && <div className="migration-banner"><p>{oldLocationCount} installed {oldLocationCount === 1 ? 'plugin is' : 'plugins are'} in a previous folder.</p><button className="button button-secondary" disabled={Boolean(busy)} onClick={() => void handleMoveAll()}><Folder size={14} />Move all to current folder</button></div>}{state.platform === 'win32' && <p className="settings-hint">Add your VST3 folder to your DAW’s plugin search paths, then rescan.</p>}</section><section className="settings-section release-settings"><div><h2>Prereleases</h2><p>Include early versions when checking for updates.</p></div><button type="button" role="switch" aria-checked={draft.includePrereleases} aria-label="Include prereleases" className={`switch ${draft.includePrereleases ? 'switch-on' : ''}`} disabled={Boolean(busy)} onClick={() => setDraft(current => ({ ...current, includePrereleases: !current.includePrereleases }))}><span /></button></section><div className="settings-actions"><span>{changed ? 'You have unsaved changes.' : 'Your preferences are saved on this computer.'}</span><button className="button button-primary" disabled={!changed || Boolean(busy) || choosing || formats.some(format => !draft.paths[format]?.trim())} onClick={() => void save(draft)}>{busy?.id === 'settings' ? <LoaderCircle size={15} className="spin" /> : <Check size={15} />}Save changes</button></div><div className="about-settings"><AudioLines size={21} strokeWidth={1.5} /><div><span>OpenVST Manager {state.appVersion}</span><p>{platformName(state.platform)} {state.arch}</p></div><button className="button button-quiet" onClick={() => void openExternal('https://github.com/alanmarcero/alan-m-OpenVSTManager/releases/latest')}>Manager releases<ArrowUpRight size={13} /></button></div></div>;
+
+  const chooseBackup = async () => {
+    if (!manager.chooseBackupDirectory) return;
+    setChoosing(true);
+    try {
+      const path = await manager.chooseBackupDirectory();
+      if (path) setDraft(current => ({ ...current, backupFolder: path }));
+    } catch (error) {
+      onError(errorMessage(error));
+    } finally {
+      setChoosing(false);
+    }
+  };
+
+  const handleCheckUpdate = async () => {
+    if (!manager.checkAppUpdate) return;
+    setCheckingUpdates(true);
+    try {
+      await operate('check-update', 'Checking manager updates', async () => {
+        await manager.checkAppUpdate!();
+        return await manager.getState();
+      });
+    } catch (error) {
+      onError(errorMessage(error));
+    } finally {
+      setCheckingUpdates(false);
+    }
+  };
+
+  const handleInstallUpdate = async () => {
+    if (!manager.installAppUpdate) return;
+    await operate('manager-update', 'Updating manager', async () => {
+      await manager.installAppUpdate!();
+      return state;
+    }, 'Update installer launched. Exiting to complete installation…');
+  };
+
+  const isBackupDefault = !draft.backupFolder || normalize(draft.backupFolder) === normalize(state.defaultBackupFolder || '');
+
+  return (
+    <div className="settings-panel">
+      {/* 1. Installation Folders */}
+      <section className="settings-section">
+        <h2>Installation folders</h2>
+        <p>Where each format is installed. A location that does not exist yet is created by the first install.</p>
+        {formats.map(format => {
+          const options = getOptions(format);
+          const currentPath = draft.paths[format] || '';
+          const defaultPath = state.defaultPaths?.[format] || '';
+          const isDefault = normalize(currentPath) === normalize(defaultPath);
+          const matchingOption = options.find(opt => normalize(opt.path) === normalize(currentPath));
+          const selectValue = matchingOption ? matchingOption.path : '__custom__';
+
+          return (
+            <div className="path-setting" key={format}>
+              <div className="path-header">
+                <label htmlFor={`path-select-${format}`}>{format === 'AU' ? 'Audio Units (AU)' : 'VST3'}</label>
+                <span className={`path-badge ${isDefault ? 'badge-default' : 'badge-custom'}`}>
+                  {isDefault ? 'Default' : 'Custom'}
+                </span>
+              </div>
+              <div className="path-preset-select">
+                <select
+                  id={`path-select-${format}`}
+                  aria-label={`${format === 'AU' ? 'Audio Units' : 'VST3'} location`}
+                  value={selectValue}
+                  onChange={event => {
+                    const next = event.target.value;
+                    if (next !== '__custom__') setDraft(current => ({ ...current, paths: { ...current.paths, [format]: next } }));
+                  }}
+                  disabled={Boolean(busy) || choosing}
+                >
+                  {options.map(option => (
+                    <option key={option.path} value={option.path}>{option.label} ({option.path})</option>
+                  ))}
+                  <option value="__custom__">Custom folder…</option>
+                </select>
+                <ChevronDown size={14} />
+              </div>
+              <div className="path-control">
+                <Folder size={17} />
+                <input
+                  id={`path-${format}`}
+                  aria-label={`${format === 'AU' ? 'Audio Units' : 'VST3'} path`}
+                  value={draft.paths[format]}
+                  onChange={event => setDraft(current => ({ ...current, paths: { ...current.paths, [format]: event.target.value } }))}
+                  spellCheck={false}
+                  autoComplete="off"
+                  disabled={Boolean(busy) || choosing}
+                />
+                <button
+                  type="button"
+                  className="button button-secondary button-small"
+                  title="Reset to default folder"
+                  disabled={Boolean(busy) || choosing || isDefault}
+                  onClick={() => {
+                    if (defaultPath) setDraft(current => ({ ...current, paths: { ...current.paths, [format]: defaultPath } }));
+                  }}
+                >
+                  <RotateCcw size={12} />Default
+                </button>
+                <button className="button button-secondary" onClick={() => void choose(format)} disabled={Boolean(busy) || choosing}>
+                  Browse
+                </button>
+              </div>
+            </div>
+          );
+        })}
+        {state.platform === 'win32' && <p className="settings-hint">Add your VST3 folder to your DAW’s plugin search paths, then rescan.</p>}
+      </section>
+
+      {/* 2. Stray Installs (From TUS: Still installed where they no longer belong) */}
+      {strayInstalls.length > 0 && (
+        <section className="settings-section stray-installs-section">
+          <div className="section-header-row">
+            <h2>Still installed where they no longer belong</h2>
+            <button
+              className="button button-secondary button-small"
+              disabled={Boolean(busy)}
+              onClick={() => void handleMoveAll()}
+            >
+              <Folder size={14} />Move all to current folder
+            </button>
+          </div>
+          <p>A location was changed after these were installed. They are still on disk and hosts that scan those folders still load them.</p>
+          <div className="stray-install-list">
+            {strayInstalls.map(({ plugin, item }) => (
+              <div className="stray-install-row" key={`${plugin.id}-${item.format}-${item.path}`}>
+                <div className="stray-install-info">
+                  <span className="stray-install-name">{plugin.name} ({item.format})</span>
+                  <span className="stray-install-path" title={item.path}>{item.path}</span>
+                </div>
+                <div className="stray-install-actions">
+                  <button
+                    className="button button-secondary button-small"
+                    disabled={Boolean(busy)}
+                    onClick={() => void operate(plugin.id, 'Moving', () => manager.move ? manager.move({ id: plugin.id, formats: [item.format], overwrite: true }) : manager.install({ id: plugin.id, tag: plugin.releases[0]?.tag ?? '', formats: [item.format], overwrite: true }), `${plugin.name} moved to current folder.`)}
+                  >
+                    Move
+                  </button>
+                  <button
+                    className="button button-danger button-small"
+                    disabled={Boolean(busy)}
+                    onClick={() => void operate(plugin.id, 'Removing', () => manager.uninstall({ id: plugin.id, formats: [item.format], unmanaged: true }), `${plugin.name} removed.`)}
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* 3. Backups Folder (From TUS) */}
+      <section className="settings-section">
+        <div className="path-header">
+          <h2>Backups</h2>
+          <span className={`path-badge ${isBackupDefault ? 'badge-default' : 'badge-custom'}`}>
+            {isBackupDefault ? 'Default' : 'Custom'}
+          </span>
+        </div>
+        <p>Where backups are kept. A folder that Dropbox, OneDrive, iCloud Drive or Google Drive synchronises keeps them off this computer as well. Backups made before a change stay in the folder they were made in.</p>
+        <div className="path-control">
+          <Folder size={17} />
+          <input
+            id="backup-folder-input"
+            aria-label="Backup folder path"
+            value={draft.backupFolder}
+            onChange={event => setDraft(current => ({ ...current, backupFolder: event.target.value }))}
+            spellCheck={false}
+            autoComplete="off"
+            disabled={Boolean(busy) || choosing}
+          />
+          <button
+            type="button"
+            className="button button-secondary button-small"
+            title="Reset to default backup folder"
+            disabled={Boolean(busy) || choosing || isBackupDefault}
+            onClick={() => {
+              if (state.defaultBackupFolder) {
+                setDraft(current => ({ ...current, backupFolder: state.defaultBackupFolder! }));
+              }
+            }}
+          >
+            <RotateCcw size={12} />Default
+          </button>
+          <button
+            className="button button-secondary"
+            onClick={() => void chooseBackup()}
+            disabled={Boolean(busy) || choosing || !manager.chooseBackupDirectory}
+          >
+            Browse
+          </button>
+        </div>
+      </section>
+
+      {/* 4. Preferred Plugin Formats (From TUS selection.xml) */}
+      <section className="settings-section">
+        <div className="section-header-row">
+          <h2>Install formats</h2>
+          <button
+            type="button"
+            className="button button-quiet button-small"
+            onClick={() => {
+              const allSelected = formats.every(f => draft.preferredFormats.includes(f));
+              setDraft(current => ({
+                ...current,
+                preferredFormats: allSelected ? ['VST3'] : [...formats],
+              }));
+            }}
+          >
+            {formats.every(f => draft.preferredFormats.includes(f)) ? 'Deselect all' : 'Select all'}
+          </button>
+        </div>
+        <p>Choose which plugin formats are selected by default when installing.</p>
+        <div className="format-options">
+          {formats.map(format => (
+            <label className={`format-option ${draft.preferredFormats.includes(format) ? 'checked' : ''}`} key={format}>
+              <input
+                type="checkbox"
+                checked={draft.preferredFormats.includes(format)}
+                onChange={() => {
+                  setDraft(current => {
+                    const exists = current.preferredFormats.includes(format);
+                    const next = exists
+                      ? current.preferredFormats.filter(f => f !== format)
+                      : [...current.preferredFormats, format];
+                    return { ...current, preferredFormats: next.length ? next : [format] };
+                  });
+                }}
+              />
+              <span className="checkbox-mark">
+                {draft.preferredFormats.includes(format) && <Check size={11} strokeWidth={2.4} />}
+              </span>
+              <span>{format === 'AU' ? 'Audio Units (AU)' : 'VST3'}</span>
+            </label>
+          ))}
+        </div>
+      </section>
+
+      {/* 5. GitHub API Token (From TUS Logins/Credentials) */}
+      <section className="settings-section">
+        <h2>GitHub Token (Optional)</h2>
+        <p>Add a personal access token to prevent GitHub rate limits when checking releases and downloading plugins (raises limit from 60 to 5,000 requests per hour).</p>
+        <div className="token-control">
+          <input
+            id="github-token-input"
+            type={showToken ? 'text' : 'password'}
+            aria-label="GitHub Personal Access Token"
+            placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+            value={draft.githubToken}
+            onChange={event => setDraft(current => ({ ...current, githubToken: event.target.value.trim() }))}
+            spellCheck={false}
+            autoComplete="off"
+            disabled={Boolean(busy)}
+          />
+          <button
+            type="button"
+            className="icon-button"
+            title={showToken ? 'Hide token' : 'Show token'}
+            onClick={() => setShowToken(prev => !prev)}
+          >
+            {showToken ? <EyeOff size={16} /> : <Eye size={16} />}
+          </button>
+          {draft.githubToken && (
+            <button
+              type="button"
+              className="button button-secondary button-small"
+              onClick={() => setDraft(current => ({ ...current, githubToken: '' }))}
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      </section>
+
+      {/* 6. OpenVST Manager Updates (Self-Update) */}
+      <section className="settings-section">
+        <div className="section-header-row">
+          <div>
+            <h2>OpenVST Manager updates</h2>
+            <p style={{ margin: '4px 0 0' }}>Keep OpenVST Manager up to date automatically or check on demand.</p>
+          </div>
+          <button
+            type="button"
+            className="button button-secondary button-small"
+            disabled={Boolean(busy) || checkingUpdates}
+            onClick={handleCheckUpdate}
+          >
+            <RefreshCw size={13} className={checkingUpdates ? 'spin' : ''} />
+            {checkingUpdates ? 'Checking…' : 'Check for updates'}
+          </button>
+        </div>
+        <div className="update-status-row">
+          <div className="update-setting-toggle">
+            <div>
+              <span className="toggle-label">Check for updates automatically</span>
+              <span className="toggle-sub">Check GitHub Releases on startup</span>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={draft.autoCheckAppUpdates}
+              aria-label="Check for updates automatically"
+              className={`switch ${draft.autoCheckAppUpdates ? 'switch-on' : ''}`}
+              disabled={Boolean(busy)}
+              onClick={() => setDraft(current => ({ ...current, autoCheckAppUpdates: !current.autoCheckAppUpdates }))}
+            >
+              <span />
+            </button>
+          </div>
+          {state.appUpdate?.available ? (
+            <div className="update-available-banner">
+              <div className="update-banner-info">
+                <Sparkles size={16} />
+                <div>
+                  <strong>OpenVST Manager v{state.appUpdate.latestVersion} is available.</strong>
+                  <span>You have version {state.appVersion}.</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="button button-primary"
+                disabled={Boolean(busy)}
+                onClick={handleInstallUpdate}
+              >
+                <Download size={14} />Update now
+              </button>
+            </div>
+          ) : (
+            <div className="update-current-note">
+              <Check size={14} /> OpenVST Manager is up to date (v{state.appVersion}).
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* 7. Prereleases */}
+      <section className="settings-section release-settings">
+        <div>
+          <h2>Prereleases</h2>
+          <p>Include early versions when checking for plugin and manager updates.</p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={draft.includePrereleases}
+          aria-label="Include prereleases"
+          className={`switch ${draft.includePrereleases ? 'switch-on' : ''}`}
+          disabled={Boolean(busy)}
+          onClick={() => setDraft(current => ({ ...current, includePrereleases: !current.includePrereleases }))}
+        >
+          <span />
+        </button>
+      </section>
+
+      {/* Actions */}
+      <div className="settings-actions">
+        <span>{changed ? 'You have unsaved changes.' : 'Your preferences are saved on this computer.'}</span>
+        <button
+          className="button button-primary"
+          disabled={!changed || Boolean(busy) || choosing || formats.some(format => !draft.paths[format]?.trim())}
+          onClick={() => void save(draft)}
+        >
+          {busy?.id === 'settings' ? <LoaderCircle size={15} className="spin" /> : <Check size={15} />}
+          Save changes
+        </button>
+      </div>
+
+      <div className="about-settings">
+        <AudioLines size={21} strokeWidth={1.5} />
+        <div>
+          <span>OpenVST Manager {state.appVersion}</span>
+          <p>{platformName(state.platform)} {state.arch}</p>
+        </div>
+        <button
+          className="button button-quiet"
+          onClick={() => void openExternal('https://github.com/alanmarcero/alan-m-OpenVSTManager/releases/latest')}
+        >
+          Manager releases<ArrowUpRight size={13} />
+        </button>
+      </div>
+    </div>
+  );
 }

@@ -5,13 +5,22 @@ import {validateCatalog} from './releases.mjs';
 const TTL = 5 * 60 * 1000;
 const MAX_JSON = 8 * 1024 * 1024;
 export class GitHubClient {
-  constructor({cacheDir,fetchImpl=fetch}) { this.cacheDir=cacheDir;this.fetch=fetchImpl; }
+  constructor({cacheDir,fetchImpl=fetch,token=null,appVersion='1.1.0'}={}) {
+    this.cacheDir=cacheDir;
+    this.fetch=fetchImpl;
+    this.token=token ? String(token).trim() : null;
+    this.appVersion=appVersion;
+  }
+  setToken(token) {
+    this.token = token ? String(token).trim() : null;
+  }
   async request(key,url,validate,{force=false}={}) {
     const file=path.join(this.cacheDir,`${key}.json`);
     const cached=await readJSON(file,null).catch(()=>null);
     if(cached && !force && Date.now()-cached.fetchedAt<TTL) return {...cached,stale:false};
     try {
-      const headers={Accept:'application/vnd.github+json','User-Agent':'OpenVSTManager/1.1.0'};
+      const headers={Accept:'application/vnd.github+json','User-Agent':`OpenVSTManager/${this.appVersion}`};
+      if(this.token) headers['Authorization'] = `Bearer ${this.token}`;
       if(cached?.etag)headers['If-None-Match']=cached.etag;
       const response=await this.fetch(url,{headers,signal:AbortSignal.timeout(20_000),redirect:'error'});
       let data;
@@ -46,5 +55,10 @@ export class GitHubClient {
   }
   catalog(options) {
     return this.request('catalog','https://raw.githubusercontent.com/alanmarcero/alan-m-OpenVSTManager/main/catalog.json',validateCatalog,options);
+  }
+  appReleases(options) {
+    return this.request('releases-OpenVSTManager','https://api.github.com/repos/alanmarcero/alan-m-OpenVSTManager/releases?per_page=50',data=>{
+      if(!Array.isArray(data))throw new Error('GitHub returned an invalid release list.');
+    },options);
   }
 }

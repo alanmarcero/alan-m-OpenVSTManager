@@ -96,3 +96,39 @@ test('service routes installAll and updateAll correctly', async t => {
   assert.equal(installedPlugins[0].tag, 'v1.0.0');
   assert.equal(installedPlugins[0].overwrite, true);
 });
+
+test('service persists backupFolder, githubToken, preferredFormats, and handles app updates', async t => {
+  const {service, dataDir, client}=await setup(t);
+  const customBackup = path.join(dataDir, 'custom-backups');
+  await service.saveSettings({
+    backupFolder: customBackup,
+    githubToken: 'ghp_test_token_123',
+    preferredFormats: ['VST3'],
+    autoCheckAppUpdates: true,
+  });
+
+  const state = await service.getState();
+  assert.equal(state.settings.backupFolder, customBackup);
+  assert.equal(state.settings.githubToken, 'ghp_test_token_123');
+  assert.deepEqual(state.settings.preferredFormats, ['VST3']);
+  assert.equal(state.settings.autoCheckAppUpdates, true);
+  assert.ok(state.defaultBackupFolder);
+  assert.ok(state.defaultPaths);
+
+  client.appReleases = async () => ({
+    data: [{
+      tag_name: 'v2.0.0',
+      assets: [{
+        name: 'OpenVSTManager-2.0.0-mac-arm64.dmg',
+        browser_download_url: 'https://github.com/alanmarcero/alan-m-OpenVSTManager/releases/download/v2.0.0/OpenVSTManager-2.0.0-mac-arm64.dmg',
+        size: 50,
+      }],
+    }],
+    stale: false,
+    fetchedAt: 12345,
+  });
+
+  const update = await service.checkAppUpdate({ force: true });
+  assert.equal(update.available, true);
+  assert.equal(update.latestVersion, '2.0.0');
+});

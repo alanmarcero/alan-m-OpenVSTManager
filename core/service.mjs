@@ -4,19 +4,31 @@ import semver from 'semver';
 import {readJSON,writeJSON} from './storage.mjs';
 import {validateCatalog,normalizeReleases,selectAsset} from './releases.mjs';
 import {downloadAsset} from './download.mjs';
-import {standardPathOptions} from './installer.mjs';
+import {standardPathOptions,defaultPaths} from './installer.mjs';
+import {findAppUpdate,downloadAppUpdate,applyAppUpdate} from './updater.mjs';
 
 export class ManagerService {
   constructor({dataDir,client,installer,platform=process.platform,arch=process.arch,appVersion,bundledCatalog,onProgress=()=>{}}) {
     Object.assign(this,{dataDir,client,installer,platform,arch,appVersion,onProgress});
     this.catalog=validateCatalog(bundledCatalog);this.releases=new Map();this.settings=null;this.loaded=false;this.busy=false;
+    this.appUpdate=null;
   }
   async init(){
     if(this.settings)return;
     const saved=await readJSON(path.join(this.dataDir,'settings.json'),{});
     this.validateSettings(saved);
     this.installer.setPaths(saved.paths || {});
-    this.settings={includePrereleases:saved.includePrereleases ?? false,paths:{...this.installer.paths}};
+    const defaultBackup=path.join(this.dataDir,'backups');
+    if(this.installer.setBackupFolder) this.installer.setBackupFolder(saved.backupFolder || defaultBackup);
+    if(this.client.setToken) this.client.setToken(saved.githubToken);
+    this.settings={
+      includePrereleases:saved.includePrereleases ?? false,
+      autoCheckAppUpdates:saved.autoCheckAppUpdates ?? true,
+      paths:{...this.installer.paths},
+      backupFolder:saved.backupFolder || defaultBackup,
+      preferredFormats:Array.isArray(saved.preferredFormats) ? saved.preferredFormats : (this.platform==='darwin'?['VST3','AU']:['VST3']),
+      githubToken:saved.githubToken || '',
+    };
   }
   async getState(){
     await this.init();
@@ -29,10 +41,20 @@ export class ManagerService {
         ...(result?.error ? {error:result.error} : {})};
     }));
     const fetched=[...this.releases.values()].map(r=>r.fetchedAt).filter(Boolean);
-    return {platform:this.platform,arch:this.arch,appVersion:this.appVersion,settings:this.settings,plugins,pathOptions:standardPathOptions({platform:this.platform}),
+    return {
+      platform:this.platform,
+      arch:this.arch,
+      appVersion:this.appVersion,
+      settings:this.settings,
+      plugins,
+      pathOptions:standardPathOptions({platform:this.platform}),
+      defaultPaths:defaultPaths({platform:this.platform}),
+      defaultBackupFolder:path.join(this.dataDir,'backups'),
+      appUpdate:this.appUpdate,
       lastChecked:fetched.length?new Date(Math.min(...fetched)).toISOString():null,
       offline:[...this.releases.values()].some(r=>r.stale),
-      ...(this.catalogError ? {error:this.catalogError} : {})};
+      ...(this.catalogError ? {error:this.catalogError} : {})
+    };
   }
   async refresh(){
     if(this.refreshing)return this.refreshing;
@@ -50,12 +72,65 @@ export class ManagerService {
       try{this.releases.set(plugin.id,await this.client.releases(plugin.repo,{force}));}
       catch(error){this.releases.set(plugin.id,{...this.releases.get(plugin.id),data:this.releases.get(plugin.id)?.data || [],stale:true,error:error.message});}
     }));
+    if(this.settings.autoCheckAppUpdates){
+      await this.checkAppUpdate({force}).catch(()=>{});
+    }
     this.loaded=true;
     return this.getState();
+  }
+  async checkAppUpdate({force=false}={}){
+    await this.init();
+    try{
+      const result=await this.client.appReleases({force});
+      this.appUpdate=findAppUpdate({
+        currentVersion:this.appVersion,
+        platform:this.platform,
+        arch:this.arch,
+        releases:result?.data || [],
+        includePrereleases:this.settings.includePrereleases
+      });
+      return this.appUpdate;
+    }catch(error){
+      this.appUpdate={available:false,currentVersion:this.appVersion,latestVersion:this.appVersion,error:error.message};
+      return this.appUpdate;
+    }
+  }
+  async installAppUpdate(){
+    await this.init();
+    if(this.busy)throw new Error('Another plugin operation is running. Wait for it to finish.');
+    if(!this.appUpdate?.available || !this.appUpdate.asset){
+      await this.checkAppUpdate({force:true});
+    }
+    if(!this.appUpdate?.available || !this.appUpdate.asset){
+      throw new Error('No OpenVST Manager update is available.');
+    }
+    return this.operate('manager-update',async()=>{
+      const tempRoot=path.join(this.dataDir,'downloads');await mkdir(tempRoot,{recursive:true});
+      const temporary=await mkdtemp(path.join(tempRoot,'update-'));
+      try{
+        this.progress('manager-update','downloading-update',`Downloading OpenVST Manager v${this.appUpdate.latestVersion}`,0);
+        const installerPath=await downloadAppUpdate({
+          asset:this.appUpdate.asset,
+          checksumAsset:this.appUpdate.checksumAsset,
+          tempDir:temporary,
+          onProgress:percent=>this.progress('manager-update','downloading-update',`Downloading OpenVST Manager v${this.appUpdate.latestVersion}`,percent),
+          fetchImpl:this.client.fetch
+        });
+        this.progress('manager-update','installing-update','Launching OpenVST Manager update installer',100);
+        applyAppUpdate({installerPath,platform:this.platform});
+        return {success:true,installerPath};
+      }finally{}
+    });
   }
   validateSettings(patch){
     if(!patch || typeof patch!=='object' || Array.isArray(patch))throw new Error('Invalid settings.');
     if(patch.includePrereleases!==undefined && typeof patch.includePrereleases!=='boolean')throw new Error('Prerelease setting must be boolean.');
+    if(patch.autoCheckAppUpdates!==undefined && typeof patch.autoCheckAppUpdates!=='boolean')throw new Error('Auto check app updates setting must be boolean.');
+    if(patch.backupFolder!==undefined && (typeof patch.backupFolder!=='string'||!path.isAbsolute(patch.backupFolder)||patch.backupFolder.includes('\0')))throw new Error('Choose an absolute backup folder.');
+    if(patch.githubToken!==undefined && typeof patch.githubToken!=='string')throw new Error('GitHub token must be a string.');
+    if(patch.preferredFormats!==undefined){
+      if(!Array.isArray(patch.preferredFormats) || patch.preferredFormats.some(f=>!['VST3','AU'].includes(f)))throw new Error('Invalid preferred formats.');
+    }
     if(patch.paths!==undefined){
       if(!patch.paths || typeof patch.paths!=='object' || Array.isArray(patch.paths))throw new Error('Invalid plugin folders.');
       for(const [format,folder] of Object.entries(patch.paths)){
@@ -66,10 +141,24 @@ export class ManagerService {
   async saveSettings(patch){
     if(this.busy)throw new Error('Wait for the current installation to finish before changing folders.');
     await this.init();this.validateSettings(patch);
-    const next={includePrereleases:patch.includePrereleases ?? this.settings.includePrereleases,paths:{...this.settings.paths,...patch.paths}};
+    const next={
+      includePrereleases:patch.includePrereleases ?? this.settings.includePrereleases,
+      autoCheckAppUpdates:patch.autoCheckAppUpdates ?? this.settings.autoCheckAppUpdates,
+      paths:{...this.settings.paths,...patch.paths},
+      backupFolder:patch.backupFolder ?? this.settings.backupFolder,
+      preferredFormats:patch.preferredFormats ?? this.settings.preferredFormats,
+      githubToken:patch.githubToken ?? this.settings.githubToken,
+    };
     this.installer.setPaths(next.paths);
+    if(this.installer.setBackupFolder) this.installer.setBackupFolder(next.backupFolder);
+    if(this.client.setToken) this.client.setToken(next.githubToken);
     try{await writeJSON(path.join(this.dataDir,'settings.json'),next);}
-    catch(error){this.installer.setPaths(this.settings.paths);throw error;}
+    catch(error){
+      this.installer.setPaths(this.settings.paths);
+      if(this.installer.setBackupFolder) this.installer.setBackupFolder(this.settings.backupFolder);
+      if(this.client.setToken) this.client.setToken(this.settings.githubToken);
+      throw error;
+    }
     this.settings=next;return this.getState();
   }
   selection({id,formats}){

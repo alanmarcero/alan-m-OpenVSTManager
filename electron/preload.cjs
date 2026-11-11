@@ -11,6 +11,9 @@ contextBridge.exposeInMainWorld('manager',{
   moveAll:()=>ipcRenderer.invoke('manager:moveAll'),
   saveSettings:settings=>ipcRenderer.invoke('manager:saveSettings',settings),
   chooseDirectory:format=>ipcRenderer.invoke('manager:chooseDirectory',format),
+  chooseBackupDirectory:()=>ipcRenderer.invoke('manager:chooseBackupDirectory'),
+  checkAppUpdate:()=>ipcRenderer.invoke('manager:checkAppUpdate'),
+  installAppUpdate:()=>ipcRenderer.invoke('manager:installAppUpdate'),
   openExternal:url=>ipcRenderer.invoke('manager:openExternal',url),
   onProgress:callback=>{
     const listener=(_event,progress)=>callback(progress);
