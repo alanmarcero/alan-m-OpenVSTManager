@@ -137,8 +137,8 @@
     }
   },
   {
-    "id": "openMaster",
-    "repo": "openMaster",
+    "id": "openBassSpace",
+    "repo": "openBassSpace",
     "name": "openBassSpace",
     "description": "Low frequency stereo width processor. Adjust frequency cutoff and width from mono to extra-wide.",
     "category": "Mastering",
@@ -147,6 +147,10 @@
         "openBassSpace.vst3",
         "openMaster.vst3",
         "Analog Master Strip.vst3"
+      ],
+      "AU": [
+        "openBassSpace.component",
+        "openMaster.component"
       ]
     }
   },

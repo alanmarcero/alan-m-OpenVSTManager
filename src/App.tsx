@@ -52,7 +52,7 @@ function PluginGlyph({ id, large = false }: { id: string; large?: boolean }) {
     <path key="scope" d="m7 27 7-3 5 8 6-21 6 28 5-15 9 3" />,
   ];
   const known = ['openglitchfx', 'openedmfilter', 'opensausage', 'opentunereq', 'openmaster', 'winamp-classic-equalizer-vst', 'winamp-classic-visualizer-vst'];
-  const knownIndex = known.indexOf(id.toLowerCase());
+  const knownIndex = id.toLowerCase() === 'openbassspace' ? 4 : known.indexOf(id.toLowerCase());
   const shape = knownIndex >= 0 ? knownIndex : seed % shapes.length;
   return <span className={`plugin-glyph glyph-${shape}${large ? ' glyph-large' : ''}`} aria-hidden="true"><svg viewBox="0 0 52 52" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">{shapes[shape]}</svg></span>;
 }
