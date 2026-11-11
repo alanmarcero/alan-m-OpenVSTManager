@@ -62,7 +62,15 @@ export function validateCatalog(value) {
       if (!suffix || !names.length || names.length > 8 || names.some(value => typeof value !== 'string' || /[\\/:\x00-\x1f]/.test(value) || value.includes('..') || !value.endsWith(suffix))) throw new Error('Invalid plugin bundle name.');
       bundleNames[format] = name;
     }
+    let aliases;
+    if (p.aliases != null) {
+      if (!Array.isArray(p.aliases) || p.aliases.length > 10 || p.aliases.some(a => typeof a !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/.test(a) || a.includes('..'))) {
+        throw new Error('Invalid catalog aliases.');
+      }
+      aliases = [...p.aliases];
+    }
     return { id:p.id,repo:p.repo,name:p.name,description:p.description,category:p.category,bundleNames,
+      ...(aliases ? { aliases } : {}),
       url:`https://github.com/alanmarcero/${p.repo}`, ...(typeof p.notice === 'string' ? {notice:p.notice.slice(0,1000)} : {}) };
   });
 }

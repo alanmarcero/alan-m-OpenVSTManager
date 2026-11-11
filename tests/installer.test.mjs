@@ -417,3 +417,55 @@ test('can uninstall an unmanaged plugin when unmanaged option is true', async (t
   assert.deepEqual(await f.installer.uninstall({ plugin, formats: ['VST3'], unmanaged: true }), []);
   await assert.rejects(stat(path.join(f.paths.VST3, 'Test.vst3')), { code: 'ENOENT' });
 });
+
+test('detects bundle version from moduleinfo.json in unmanaged plugin', async (t) => {
+  const f = await fixture(t);
+  const bundle = path.join(f.paths.VST3, 'Test.vst3');
+  await mkdir(path.join(bundle, 'Contents', 'Resources'), { recursive: true });
+  await writeFile(path.join(bundle, 'Contents', 'Resources', 'moduleinfo.json'), JSON.stringify({ Name: 'Test', Version: '1.4.2' }));
+  const detected = await f.installer.detect(plugin);
+  assert.equal(detected.length, 1);
+  assert.equal(detected[0].managed, false);
+  assert.equal(detected[0].version, 'v1.4.2');
+});
+
+test('resolves historical receipts under an alias and migrates receipt', async (t) => {
+  const aliasPlugin = { id: 'new-name', aliases: ['old-name'], bundleNames: { VST3: ['Test.vst3', 'OldTest.vst3'] } };
+  const f = await fixture(t);
+  const installer = new Installer({ dataDir: f.dataDir, paths: f.paths, platform: 'darwin', plugins: [aliasPlugin] });
+  
+  // Create an installed bundle on disk
+  const bundle = path.join(f.paths.VST3, 'Test.vst3');
+  await mkdir(path.join(bundle, 'Contents'), { recursive: true });
+  await writeFile(path.join(bundle, 'Contents', 'Test'), 'v1');
+  const fileStat = await stat(bundle, { bigint: true });
+  
+  // Write a receipt under the old alias
+  await mkdir(f.dataDir, { recursive: true });
+  await writeFile(path.join(f.dataDir, 'receipts.json'), JSON.stringify({
+    version: 1,
+    installs: {
+      'old-name:VST3': {
+        pluginId: 'old-name',
+        format: 'VST3',
+        bundleName: 'Test.vst3',
+        path: bundle,
+        root: f.paths.VST3,
+        version: 'v1.0.0',
+        identity: { dev: String(fileStat.dev), ino: String(fileStat.ino) }
+      }
+    }
+  }));
+
+  const detected = await installer.detect(aliasPlugin);
+  assert.equal(detected.length, 1);
+  assert.equal(detected[0].managed, true);
+  assert.equal(detected[0].version, 'v1.0.0');
+
+  // Verify receipts.json was migrated to canonical key
+  const receipts = JSON.parse(await readFile(path.join(f.dataDir, 'receipts.json'), 'utf8'));
+  assert.equal(receipts.installs['old-name:VST3'], undefined);
+  assert.ok(receipts.installs['new-name:VST3']);
+  assert.equal(receipts.installs['new-name:VST3'].pluginId, 'new-name');
+  assert.equal(receipts.installs['new-name:VST3'].version, 'v1.0.0');
+});

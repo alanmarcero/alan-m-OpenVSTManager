@@ -59,3 +59,10 @@ test('catalog supports explicit historical bundle aliases but still rejects unsa
  assert.deepEqual(validateCatalog([plugin])[0].bundleNames.VST3,['openMaster.vst3','Analog Master Strip.vst3']);
  assert.throws(()=>validateCatalog([{...plugin,bundleNames:{VST3:['openMaster.vst3','../../evil.vst3']}}]),/bundle/);
 });
+test('catalog supports plugin aliases and validates them', () => {
+ const plugin = { id: 'openBassSpace', repo: 'openBassSpace', name: 'openBassSpace', description: 'Mastering', category: 'Mastering', aliases: ['openMaster'], bundleNames: { VST3: 'openBassSpace.vst3' } };
+ assert.deepEqual(validateCatalog([plugin])[0].aliases, ['openMaster']);
+ assert.throws(() => validateCatalog([{ ...plugin, aliases: ['../evil'] }]), /aliases/);
+ assert.throws(() => validateCatalog([{ ...plugin, aliases: 'not-an-array' }]), /aliases/);
+ assert.throws(() => validateCatalog([{ ...plugin, aliases: [123] }]), /aliases/);
+});

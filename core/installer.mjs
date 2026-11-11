@@ -3,6 +3,7 @@ import { createReadStream } from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
 import path from 'node:path';
+import semver from 'semver';
 import { extractArchive } from './archive.mjs';
 
 const FORMATS = ['VST3', 'AU'];
@@ -66,13 +67,46 @@ function bundleNames(plugin, format) {
   return names;
 }
 
+async function detectBundleVersion(bundlePath, format) {
+  try {
+    if (format === 'VST3') {
+      const moduleInfoPath = path.join(bundlePath, 'Contents', 'Resources', 'moduleinfo.json');
+      const text = await fs.readFile(moduleInfoPath, 'utf8').catch(() => null);
+      if (text) {
+        const match = text.match(/"Version"\s*:\s*"([^"]+)"/i);
+        if (match && match[1]) {
+          const v = match[1].trim();
+          const normalized = v.startsWith('v') ? v : `v${v}`;
+          if (semver.valid(normalized)) return normalized;
+        }
+      }
+    }
+    const plistPath = path.join(bundlePath, 'Contents', 'Info.plist');
+    const plistText = await fs.readFile(plistPath, 'utf8').catch(() => null);
+    if (plistText) {
+      const match = plistText.match(/<key>CFBundleShortVersionString<\/key>\s*<string>([^<]+)<\/string>/i)
+        || plistText.match(/<key>CFBundleVersion<\/key>\s*<string>([^<]+)<\/string>/i);
+      if (match && match[1]) {
+        const v = match[1].trim();
+        const normalized = v.startsWith('v') ? v : `v${v}`;
+        if (semver.valid(normalized)) return normalized;
+      }
+    }
+  } catch { /* Version introspection is best-effort */ }
+  return null;
+}
+
 function validatePlugin(plugin) {
   if (!plugin || typeof plugin.id !== 'string' || !/^[a-z0-9][a-z0-9._-]{0,100}$/i.test(plugin.id)) throw new Error('Invalid plugin identity');
+  if (plugin.aliases != null) {
+    if (!Array.isArray(plugin.aliases) || plugin.aliases.some((a) => typeof a !== 'string' || !/^[a-z0-9][a-z0-9._-]{0,100}$/i.test(a))) throw new Error('Invalid plugin aliases');
+  }
   for (const format of FORMATS) bundleNames(plugin, format);
 }
 
 function validateRecord(record, plugin, format) {
-  if (!record || record.pluginId !== plugin.id || record.format !== format || !bundleNames(plugin, format).includes(record.bundleName)
+  const validId = record && (record.pluginId === plugin.id || (Array.isArray(plugin.aliases) && plugin.aliases.includes(record.pluginId)));
+  if (!record || !validId || record.format !== format || !bundleNames(plugin, format).includes(record.bundleName)
     || typeof record.path !== 'string' || typeof record.root !== 'string' || !path.isAbsolute(record.path) || !path.isAbsolute(record.root)
     || path.normalize(record.path) !== record.path || path.normalize(record.root) !== record.root
     || record.path !== path.join(record.root, record.bundleName) || typeof record.version !== 'string'
@@ -121,7 +155,13 @@ export class Installer {
     this.paths = defaultPaths({ platform, home });
     this.setPaths(paths);
     this.setBackupFolder(backupFolder);
-    for (const plugin of plugins) { validatePlugin(plugin); this.#plugins.set(plugin.id, plugin); }
+    for (const plugin of plugins) {
+      validatePlugin(plugin);
+      this.#plugins.set(plugin.id, plugin);
+      if (plugin.aliases) {
+        for (const alias of plugin.aliases) this.#plugins.set(alias, plugin);
+      }
+    }
   }
 
   setBackupFolder(backupFolder) {
@@ -176,6 +216,9 @@ export class Installer {
   async #ensureRecovery(plugin) {
     validatePlugin(plugin);
     this.#plugins.set(plugin.id, plugin);
+    if (plugin.aliases) {
+      for (const alias of plugin.aliases) this.#plugins.set(alias, plugin);
+    }
     if (!this.#recovering) {
       this.#recovering = (async () => {
         let journal;
@@ -272,19 +315,45 @@ export class Installer {
     return committed;
   }
 
+  #findRecord(receipts, plugin, format) {
+    const canonicalKey = `${plugin.id}:${format}`;
+    if (receipts.installs[canonicalKey]) return { key: canonicalKey, record: receipts.installs[canonicalKey] };
+    const aliases = plugin.aliases || [];
+    for (const alias of aliases) {
+      const aliasKey = `${alias}:${format}`;
+      if (receipts.installs[aliasKey]) return { key: aliasKey, record: receipts.installs[aliasKey] };
+    }
+    for (const [key, candidate] of Object.entries(receipts.installs)) {
+      if (candidate.format === format && bundleNames(plugin, format).includes(candidate.bundleName)) {
+        if (candidate.pluginId === plugin.id || (plugin.aliases && plugin.aliases.includes(candidate.pluginId))) {
+          return { key, record: candidate };
+        }
+      }
+    }
+    return null;
+  }
+
   async #detect(plugin) {
     validatePlugin(plugin);
     const receipts = await this.#loadReceipts().catch(() => ({ installs: {} }));
+    let receiptsModified = false;
     const installed = [];
     for (const format of FORMATS) {
       if (format === 'AU' && this.platform !== 'darwin') continue;
-      const record = receipts.installs[`${plugin.id}:${format}`];
+      const canonicalKey = `${plugin.id}:${format}`;
+      const found = this.#findRecord(receipts, plugin, format);
+      const record = found?.record;
       const seen = new Set();
       if (record) {
         try {
           validateRecord(record, plugin, format);
           if (await exists(record.path)) {
             const managed = await ownsRecord(record);
+            if (managed && found.key !== canonicalKey) {
+              receipts.installs[canonicalKey] = { ...record, pluginId: plugin.id };
+              delete receipts.installs[found.key];
+              receiptsModified = true;
+            }
             const locationMismatch = Boolean(managed && this.paths[format] && path.resolve(record.root) !== path.resolve(this.paths[format]));
             installed.push({ format, version: managed ? record.version : null, path: record.path, managed, ...(locationMismatch ? { locationMismatch: true } : {}) });
             seen.add(record.path);
@@ -295,9 +364,15 @@ export class Installer {
         const root = await fs.realpath(this.paths[format]).catch((error) => { if (error.code === 'ENOENT') return null; throw error; });
         if (root) for (const name of bundleNames(plugin, format)) {
           const filename = path.join(root, name);
-          if (!seen.has(filename) && await exists(filename)) installed.push({ format, version: null, path: filename, managed: false });
+          if (!seen.has(filename) && await exists(filename)) {
+            const detectedVersion = await detectBundleVersion(filename, format);
+            installed.push({ format, version: detectedVersion, path: filename, managed: false });
+          }
         }
       }
+    }
+    if (receiptsModified) {
+      await this.#writeState('receipts.json', receipts).catch(() => {});
     }
     return installed;
   }
@@ -330,7 +405,9 @@ export class Installer {
           await fs.mkdir(this.paths[format], { recursive: true });
           const root = await fs.realpath(this.paths[format]);
           const target = path.join(root, bundleName), key = `${plugin.id}:${format}`;
-          const previous = receipts.installs[key];
+          const found = this.#findRecord(receipts, plugin, format);
+          const previous = found?.record;
+          const oldAliasKey = found && found.key !== key ? found.key : null;
           if (previous) {
             validateRecord(previous, plugin, format);
             if (await exists(previous.path) && !await ownsRecord(previous)) throw new Error(`Installation ownership changed externally: ${previous.path}`);
@@ -355,7 +432,7 @@ export class Installer {
               }
             }
           }
-          changes.push({ key, format, source, target, root, bundleName, previous: changePrevious });
+          changes.push({ key, oldAliasKey, format, source, target, root, bundleName, previous: changePrevious });
         }
         await this.#transaction(receipts, changes, tag);
         for (const oldPath of extraCleanups) {
@@ -375,7 +452,9 @@ export class Installer {
       const extraCleanups = [];
       for (const format of formats) {
         const key = `${plugin.id}:${format}`;
-        const previous = receipts.installs[key];
+        const found = this.#findRecord(receipts, plugin, format);
+        const previous = found?.record;
+        const oldAliasKey = found && found.key !== key ? found.key : null;
         await fs.mkdir(this.paths[format], { recursive: true });
         const root = await fs.realpath(this.paths[format]);
         const bundleName = previous?.bundleName || bundleNames(plugin, format)[0];
@@ -403,6 +482,7 @@ export class Installer {
           }
           changes.push({
             key,
+            oldAliasKey,
             format,
             source: previous.path,
             target,
@@ -423,6 +503,7 @@ export class Installer {
               version: previous.version,
               identity: identity(targetInfo),
             };
+            if (oldAliasKey) delete receipts.installs[oldAliasKey];
           } else {
             throw new Error(`Cannot move ${plugin.id} ${format}: installation not found at ${previous?.path || 'source'}`);
           }
@@ -447,7 +528,10 @@ export class Installer {
       const receipts = await this.#loadReceipts(), changes = [];
       const extraCleanups = [];
       for (const format of formats) {
-        const key = `${plugin.id}:${format}`, previous = receipts.installs[key];
+        const key = `${plugin.id}:${format}`;
+        const found = this.#findRecord(receipts, plugin, format);
+        const previous = found?.record;
+        const oldAliasKey = found && found.key !== key ? found.key : null;
         let changePrevious = null;
         if (previous) {
           validateRecord(previous, plugin, format);
@@ -481,7 +565,7 @@ export class Installer {
           }
         }
         if (changePrevious) {
-          changes.push({ key, previous: changePrevious });
+          changes.push({ key, oldAliasKey, previous: changePrevious });
         }
       }
       if (changes.length) await this.#transaction(receipts, changes);
@@ -509,7 +593,11 @@ export class Installer {
           await fs.cp(change.source, entry.prepared, { recursive: true, force: false, errorOnExist: true });
           entry.next = { pluginId: change.key.slice(0, change.key.lastIndexOf(':')), format: change.format, bundleName: change.bundleName, path: change.target, root: change.root, version: change.version || version, identity: identity(await fs.lstat(entry.prepared, { bigint: true })) };
           next.installs[change.key] = entry.next;
-        } else delete next.installs[change.key];
+          if (change.oldAliasKey) delete next.installs[change.oldAliasKey];
+        } else {
+          delete next.installs[change.key];
+          if (change.oldAliasKey) delete next.installs[change.oldAliasKey];
+        }
         if (change.previous && await exists(change.previous.path)) {
           if (!await ownsRecord(change.previous)) throw new Error(`Installation ownership changed: ${change.previous.path}`);
           entry.backup = path.join(await directory(change.previous.root, '.openvstmanager-backup-'), change.previous.bundleName);
