@@ -15,6 +15,8 @@ declare global {
   }
 }
 
+const TEST_SCREENSHOT = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAADCAIAAAA7ljmRAAAAD0lEQVR4nGNg+M/A8J+BAAYSAQM3K07jAAAAAElFTkSuQmCC';
+
 const initialState: ManagerState = {
   platform: 'darwin', arch: 'arm64', appVersion: '0.1.0',
   lastChecked: '2026-10-21T12:00:00Z', offline: false,
@@ -33,12 +35,16 @@ const initialState: ManagerState = {
   plugins: catalog.map(plugin => ({
     ...plugin,
     url: `https://github.com/alanmarcero/${plugin.repo}`,
+    screenshotUrl: TEST_SCREENSHOT,
     formats: Object.keys(plugin.bundleNames) as PluginFormat[],
     installed: plugin.id === 'openEDMFilter'
       ? [{ format: 'VST3', version: 'v0.9.0', path: '/tmp/openvst-test/existing.vst3', managed: true }]
       : [],
     releases: [{
-      tag: 'v1.0.0', name: 'v1.0.0', publishedAt: '2026-10-20T12:00:00Z', notes: '',
+      tag: 'v1.0.0', name: 'v1.0.0', publishedAt: '2026-10-20T12:00:00Z',
+      notes: plugin.id === 'openEDMFilter'
+        ? '# openEDMFilter 1.0.0\n\nAdds analog drive curves and LFO sync refinements.\n\n- Improved filter envelope tracking.\n\n![Preview](https://raw.githubusercontent.com/alanmarcero/openEDMFilter/v1.0.0/assets/native-ui.png)'
+        : '',
       url: `https://github.com/alanmarcero/${plugin.repo}/releases/tag/v1.0.0`,
       assets: [{ name: `${plugin.repo}-macOS.zip`, url: 'https://example.invalid/test.zip', size: 1024, compatible: true }],
     }],
@@ -219,4 +225,30 @@ test('can install all uninstalled plugins with one button press', async ({ page 
   await expect(page.getByRole('button', { name: 'Install all', exact: true })).toHaveCount(0);
   const installCalls = await page.evaluate(() => window.__managerTest.calls.filter(c => c.kind === 'install'));
   expect(installCalls.length).toBe(catalog.length - 1);
+});
+
+test('shows latest release notes when updates exist, renders auto-updating screenshots with lightbox, and gives every plugin a distinct icon', async ({ page }) => {
+  const glyphMarkups = await page.locator('.plugin-row .plugin-glyph svg').evaluateAll(svgs => svgs.map(s => s.innerHTML));
+  expect(glyphMarkups.length).toBe(catalog.length);
+  expect(new Set(glyphMarkups).size).toBe(catalog.length);
+
+  await page.getByRole('button', { name: /openEDMFilter Filter/ }).click();
+  const notesPanel = page.getByRole('region', { name: 'Release notes for version 1.0.0' });
+  await expect(notesPanel).toBeVisible();
+  await expect(notesPanel).toContainText('Adds analog drive curves and LFO sync refinements.');
+  await expect(notesPanel).toContainText('Improved filter envelope tracking.');
+
+  const shotButton = page.getByRole('button', { name: 'Enlarge openEDMFilter screenshot' });
+  await expect(shotButton).toBeVisible();
+  await expect(shotButton.locator('img')).toHaveAttribute('src', TEST_SCREENSHOT);
+  await shotButton.click();
+  const modal = page.getByRole('dialog', { name: 'openEDMFilter' });
+  await expect(modal).toBeVisible();
+  await expectSeparatedControls(page);
+  await modal.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(modal).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Updates', exact: true }).click();
+  await expect(page.locator('.plugin-row .plugin-update-summary')).toContainText('Adds analog drive curves and LFO sync refinements.');
+  await expectSeparatedControls(page);
 });

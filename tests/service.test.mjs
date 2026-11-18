@@ -132,3 +132,35 @@ test('service persists backupFolder, githubToken, preferredFormats, and handles 
   assert.equal(update.available, true);
   assert.equal(update.latestVersion, '2.0.0');
 });
+test('service attaches and auto-updates plugin screenshotUrl without failing on screenshot errors', async t => {
+  const dataDir = await mkdtemp(path.join(tmpdir(), 'openvst-service-shot-'));
+  t.after(() => rm(dataDir, { recursive: true, force: true }));
+  let version = 'aaa111';
+  let failShot = false;
+  const client = {
+    catalog: async () => ({ data: [plugin], stale: false }),
+    releases: async () => ({ data: [], stale: false, fetchedAt: 12345 }),
+    screenshot: async () => {
+      if (failShot) throw new Error('404 Not Found');
+      return { contentType: 'image/png', version, fetchedAt: 12345, stale: false };
+    },
+  };
+  const installer = { paths: { VST3: '/tmp/plugins' }, setPaths() {}, detect: async () => [] };
+  const service = new ManagerService({
+    dataDir, client, installer, platform: 'win32', arch: 'x64',
+    appVersion: '1.3.0', bundledCatalog: [plugin],
+    screenshotBaseUrl: 'openvst://app/screenshots',
+  });
+
+  const first = await service.getState();
+  assert.equal(first.plugins[0].screenshotUrl, 'openvst://app/screenshots/openMaster.png?v=aaa111');
+
+  version = 'bbb222';
+  const refreshed = await service.refresh();
+  assert.equal(refreshed.plugins[0].screenshotUrl, 'openvst://app/screenshots/openMaster.png?v=bbb222');
+
+  failShot = true;
+  const resilient = await service.refresh();
+  assert.equal(resilient.offline, false);
+  assert.equal(resilient.plugins[0].screenshotUrl, 'openvst://app/screenshots/openMaster.png?v=bbb222');
+});

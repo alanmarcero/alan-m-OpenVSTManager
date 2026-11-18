@@ -66,3 +66,11 @@ test('catalog supports plugin aliases and validates them', () => {
  assert.throws(() => validateCatalog([{ ...plugin, aliases: 'not-an-array' }]), /aliases/);
  assert.throws(() => validateCatalog([{ ...plugin, aliases: [123] }]), /aliases/);
 });
+test('catalog validates screenshotPath and defaults to canonical preview screenshot', () => {
+ const plugin = { id: 'openMaster', repo: 'openMaster', name: 'openMaster', description: 'Mastering', category: 'Mastering', bundleNames: { VST3: 'openMaster.vst3' } };
+ assert.equal(validateCatalog([plugin])[0].screenshotPath, 'docs/screenshots/preview.png');
+ assert.equal(validateCatalog([{ ...plugin, screenshotPath: 'assets/ui.png' }])[0].screenshotPath, 'assets/ui.png');
+ assert.throws(() => validateCatalog([{ ...plugin, screenshotPath: '../secret.png' }]), /screenshot path/);
+ assert.throws(() => validateCatalog([{ ...plugin, screenshotPath: '/abs/preview.png' }]), /screenshot path/);
+ assert.throws(() => validateCatalog([{ ...plugin, screenshotPath: 'docs/readme.md' }]), /screenshot path/);
+});

@@ -39,6 +39,8 @@ export interface Plugin {
   releases: PluginRelease[];
   error?: string;
   notice?: string;
+  screenshotPath?: string;
+  screenshotUrl?: string;
 }
 
 export interface PathOption {

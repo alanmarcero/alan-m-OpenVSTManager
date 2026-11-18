@@ -3,9 +3,11 @@ import { gt, valid } from 'semver';
 import {
   ArrowDownToLine, ArrowUpRight, AudioLines, Check, CheckCheck, ChevronDown,
   ChevronRight, CircleAlert, CircleCheck, Download, ExternalLink, Eye, EyeOff, Folder,
-  Library, LoaderCircle, Monitor, Moon, RefreshCw, RotateCcw, Search, Settings2, SlidersHorizontal,
+  Library, LoaderCircle, Maximize2, Monitor, Moon, RefreshCw, RotateCcw, Search, Settings2, SlidersHorizontal,
   Sparkles, Sun, Trash2, WifiOff, X, Zap,
 } from 'lucide-react';
+import { BrandMark, PluginGlyph } from './pluginIcons';
+import { ReleaseNotesBody, summarizeReleaseNotes } from './ReleaseNotes';
 import type { AppUpdateInfo, InstalledPlugin, ManagerAPI, ManagerState, PathOption, Plugin, PluginFormat, PluginRelease, Progress, Settings } from './types';
 
 type View = 'library' | 'installed' | 'updates' | 'settings';
@@ -41,25 +43,8 @@ function checkedTime(value: ManagerState['lastChecked']) {
   return `Checked ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
 }
 
-function PluginGlyph({ id, large = false }: { id: string; large?: boolean }) {
-  const seed = [...id].reduce((total, character) => total + character.charCodeAt(0), 0);
-  const shapes = [
-    <path key="glitch" d="M8 24h6V13h6v23h7V19h6v10h7V16h4" />,
-    <path key="filter" d="M7 35c9 0 10-23 20-23s10 24 18 24M7 35h38" />,
-    <path key="wave" d="M7 26c4-17 9-17 13 0s9 17 13 0 9-17 13 0" />,
-    <><path key="eq" d="M10 15v24M21 10v29M32 15v24M43 10v29" /><path key="sliders" d="M7 23h6M18 31h6M29 22h6M40 17h6" /></>,
-    <path key="master" d="M8 35V23m7 12V16m7 19V11m7 24V20m7 15V14m7 21V24" />,
-    <path key="curve" d="M7 34c10 0 10-18 18-18s10 13 20 13" />,
-    <path key="scope" d="m7 27 7-3 5 8 6-21 6 28 5-15 9 3" />,
-  ];
-  const known = ['openglitchfx', 'openedmfilter', 'opensausage', 'opentunereq', 'openmaster', 'winamp-classic-equalizer-vst', 'winamp-classic-visualizer-vst'];
-  const knownIndex = id.toLowerCase() === 'openbassspace' ? 4 : known.indexOf(id.toLowerCase());
-  const shape = knownIndex >= 0 ? knownIndex : seed % shapes.length;
-  return <span className={`plugin-glyph glyph-${shape}${large ? ' glyph-large' : ''}`} aria-hidden="true"><svg viewBox="0 0 52 52" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">{shapes[shape]}</svg></span>;
-}
-
 function Brand() {
-  return <div className="brand"><span className="brand-mark" aria-hidden="true"><AudioLines size={25} strokeWidth={1.5} /></span><span>OpenVST<span className="brand-subtitle">Manager</span></span></div>;
+  return <div className="brand"><span className="brand-mark" aria-hidden="true"><BrandMark size={26} /></span><span>OpenVST<span className="brand-subtitle">Manager</span></span></div>;
 }
 
 export function App() {
@@ -291,7 +276,7 @@ export function App() {
                   <section className="library-toolbar" aria-label="Filter plugins"><div className="search-field"><Search size={17} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search plugins" aria-label="Search plugins" />{query && <button className="icon-button clear-search" aria-label="Clear search" onClick={() => setQuery('')}><X size={14} /></button>}</div><div className="category-select"><SlidersHorizontal size={15} /><select aria-label="Category" value={category} onChange={event => setCategory(event.target.value)}><option>All categories</option>{categories.map(item => <option key={item}>{item}</option>)}</select><ChevronDown size={13} /></div><div className="toolbar-actions">{uninstalledCount > 0 && (view === 'library' || view === 'installed' || view === 'updates') && <button className="button button-primary install-all" disabled={Boolean(busy)} onClick={() => void installAll()}>{isInstallingAll ? <LoaderCircle size={15} className="spin" /> : <Download size={15} />}{isInstallingAll ? 'Installing all…' : 'Install all'}</button>}{updateCount > 0 && (view === 'updates' || view === 'installed' || view === 'library') && <button className={`button ${uninstalledCount > 0 && view === 'library' ? 'button-secondary' : 'button-primary'} update-all`} disabled={Boolean(busy)} onClick={() => void updateAll()}>{isUpdatingAll ? <LoaderCircle size={15} className="spin" /> : (uninstalledCount > 0 && view === 'library' ? <RefreshCw size={14} /> : <Download size={15} />)}{isUpdatingAll ? 'Updating all…' : 'Update all'}</button>}{installedCount > 0 && (view === 'installed' || view === 'updates') && <button className="button button-danger uninstall-all" disabled={Boolean(busy)} onClick={() => setConfirmUninstallAll(true)}><Trash2 size={15} />Uninstall all</button>}<span className="result-count">{visible.length} {visible.length === 1 ? 'plugin' : 'plugins'}</span></div></section>
                   {(busy?.id === 'all' || isSingleBusy) && <div className="active-progress-banner" role="status" aria-label="Operation progress"><div className="active-progress-header"><div className="active-progress-label"><LoaderCircle className="spin" size={15} /><span className="active-progress-message">{progress?.message || (busy?.action ? `${busy.action}…` : 'Processing…')}</span></div>{activePercent !== undefined && <span className="active-progress-percent">{activePercent}%</span>}</div><div className={`progress-track ${activePercent === undefined ? 'indeterminate' : ''}`} role="progressbar" aria-label="Operation progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={activePercent}><span style={activePercent === undefined ? undefined : { width: `${activePercent}%` }} /></div></div>}
                   {visible.length === 0 ? <div className="state-screen empty-state"><span className="state-symbol">{view === 'updates' && !query && category === 'All categories' ? <CheckCheck size={31} strokeWidth={1.5} /> : <AudioLines size={31} strokeWidth={1.5} />}</span><h2>{query || category !== 'All categories' ? 'No matching plugins' : view === 'installed' ? 'Your collection starts here' : view === 'updates' ? 'You’re up to date' : 'No plugins to show'}</h2><p>{query || category !== 'All categories' ? 'Try another search or choose a different category.' : view === 'installed' ? 'Choose a plugin from the library to install your first audio tool.' : view === 'updates' ? 'There are no newer releases for your installed plugins.' : 'Check for updates to load available releases.'}</p>{query || category !== 'All categories' ? <button className="button button-secondary" onClick={() => { setQuery(''); setCategory('All categories'); }}>Clear filters</button> : view === 'installed' ? <button className="button button-secondary" onClick={() => navigate('library')}>Browse library</button> : null}</div>
-                    : <div className="library-layout"><section className="plugin-list" aria-label="Plugin library"><div className="list-heading"><span>Plugin</span><span>Version</span></div>{visible.map(plugin => <PluginRow key={plugin.id} plugin={plugin} selected={plugin.id === selected?.id} busy={busy} progress={progress} onSelect={() => setSelectedId(plugin.id)} />)}<p className="library-footnote">Rescan plugins in your DAW after installing.</p></section>{selected && <PluginDetail key={selected.id} plugin={selected} state={state} busy={busy} progress={progress} openExternal={openExternal} install={(tag, formats, options) => operate(selected.id, 'Installing', () => manager.install({ id: selected.id, tag, formats, ...options }), `${selected.name} installed.`)} uninstall={(formats, options) => operate(selected.id, 'Removing', () => manager.uninstall({ id: selected.id, formats, ...options }), `${selected.name} removed.`)} move={(formats, options) => operate(selected.id, 'Moving', () => manager.move ? manager.move({ id: selected.id, formats, ...options }) : manager.install({ id: selected.id, tag: selected.releases[0]?.tag ?? '', formats, ...options }), `${selected.name} moved.`)} />}</div>}
+                    : <div className="library-layout"><section className="plugin-list" aria-label="Plugin library"><div className="list-heading"><span>Plugin</span><span>Version</span></div>{visible.map(plugin => <PluginRow key={plugin.id} plugin={plugin} selected={plugin.id === selected?.id} busy={busy} progress={progress} showUpdateNotes={view === 'updates'} onSelect={() => setSelectedId(plugin.id)} />)}<p className="library-footnote">Rescan plugins in your DAW after installing.</p></section>{selected && <PluginDetail key={selected.id} plugin={selected} state={state} busy={busy} progress={progress} openExternal={openExternal} install={(tag, formats, options) => operate(selected.id, 'Installing', () => manager.install({ id: selected.id, tag, formats, ...options }), `${selected.name} installed.`)} uninstall={(formats, options) => operate(selected.id, 'Removing', () => manager.uninstall({ id: selected.id, formats, ...options }), `${selected.name} removed.`)} move={(formats, options) => operate(selected.id, 'Moving', () => manager.move ? manager.move({ id: selected.id, formats, ...options }) : manager.install({ id: selected.id, tag: selected.releases[0]?.tag ?? '', formats, ...options }), `${selected.name} moved.`)} />}</div>}
                 </>}
             </>}
     </main>
@@ -315,17 +300,19 @@ export function App() {
   </div>;
 }
 
-function PluginRow({ plugin, selected, busy, progress, onSelect }: { plugin: Plugin; selected: boolean; busy: Busy; progress: Progress | null; onSelect: () => void }) {
+function PluginRow({ plugin, selected, busy, progress, showUpdateNotes = false, onSelect }: { plugin: Plugin; selected: boolean; busy: Busy; progress: Progress | null; showUpdateNotes?: boolean; onSelect: () => void }) {
   const update = hasUpdate(plugin);
   const installed = plugin.installed.length > 0;
-  const release = latestAvailableRelease(plugin) ?? plugin.releases[0];
+  const latestRelease = latestAvailableRelease(plugin);
+  const release = latestRelease ?? plugin.releases[0];
+  const updateSummary = showUpdateNotes && update && latestRelease ? summarizeReleaseNotes(latestRelease.notes) : '';
   const isWorking = busy?.id === plugin.id || (busy?.id === 'all' && progress?.id === plugin.id);
   const workingAction = busy?.id === plugin.id
     ? (busy.action === 'Installing' && update ? 'Updating…' : `${busy.action}…`)
     : (progress?.phase === 'updating' ? 'Updating…' : 'Installing…');
   return <button className={`plugin-row ${selected ? 'selected' : ''}`} onClick={onSelect} aria-pressed={selected}>
     <PluginGlyph id={plugin.id} />
-    <span className="plugin-row-copy"><span className="plugin-name">{plugin.name}</span><span className="plugin-category">{plugin.category}</span></span>
+    <span className="plugin-row-copy"><span className="plugin-name">{plugin.name}</span><span className="plugin-category">{plugin.category}</span>{updateSummary && <span className="plugin-update-summary">{updateSummary}</span>}</span>
     <span className="plugin-row-status"><span className="plugin-version">{release ? formatVersion(release.tag) : '—'}</span><span className={`status-label ${update ? 'status-update' : installed ? 'status-installed' : ''}`}>{isWorking ? <><LoaderCircle size={11} className="spin" />{workingAction}</> : update ? <><span className="status-dot" />Update available</> : installed ? <><Check size={12} />Installed</> : plugin.error ? 'Release unavailable' : isAvailable(release) ? plugin.formats.join(' / ') : 'Source available'}</span></span>
     <ChevronRight className="row-chevron" size={14} />
   </button>;
@@ -349,6 +336,13 @@ function PluginDetail({ plugin, state, busy, progress, openExternal, install, un
   });
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [confirmReplace, setConfirmReplace] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
+  const [showScreenshotModal, setShowScreenshotModal] = useState(false);
+  useEffect(() => {
+    setImageFailed(false);
+  }, [plugin.screenshotUrl]);
+  const updateRelease = latestAvailableRelease(plugin);
+  const pluginHasUpdate = hasUpdate(plugin);
   const release = plugin.releases.find(item => item.tag === tag) ?? plugin.releases[0];
 
   const managed = plugin.installed.filter(item => item.managed);
@@ -399,8 +393,35 @@ function PluginDetail({ plugin, state, busy, progress, openExternal, install, un
     <h2>{plugin.name}</h2>
     <p className="plugin-description">{plugin.description}</p>
     {plugin.notice && <p className="plugin-notice">{plugin.notice}</p>}
+    {plugin.screenshotUrl && !imageFailed && (
+      <div className="plugin-screenshot-card">
+        <button
+          type="button"
+          className="plugin-screenshot-button"
+          onClick={() => setShowScreenshotModal(true)}
+          aria-label={`Enlarge ${plugin.name} screenshot`}
+        >
+          <img
+            className="plugin-screenshot"
+            src={plugin.screenshotUrl}
+            alt={`${plugin.name} interface preview`}
+            onError={() => setImageFailed(true)}
+          />
+          <span className="screenshot-zoom-hint" aria-hidden="true"><Maximize2 size={12} />Preview</span>
+        </button>
+      </div>
+    )}
     <div className="detail-divider" />
     {plugin.error && <p className="inline-error"><CircleAlert size={15} />{plugin.error}</p>}
+    {pluginHasUpdate && updateRelease && (
+      <section className="plugin-update-notes" aria-label={`Release notes for version ${formatVersion(updateRelease.tag)}`}>
+        <div className="plugin-update-notes-header">
+          <span className="status-dot" aria-hidden="true" />
+          <span>What’s new in v{formatVersion(updateRelease.tag)}</span>
+        </div>
+        <ReleaseNotesBody notes={updateRelease.notes} />
+      </section>
+    )}
     <div className="version-label"><label htmlFor={`release-${plugin.id}`}>Release</label>{release?.publishedAt && <span>{new Date(release.publishedAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</span>}</div>
     <div className="release-select"><select id={`release-${plugin.id}`} value={release?.tag ?? ''} onChange={event => setTag(event.target.value)} disabled={!plugin.releases.length || Boolean(busy)}>{plugin.releases.length ? plugin.releases.map((item, index) => <option key={item.tag} value={item.tag}>Version {formatVersion(item.tag)}{index === 0 ? ' (latest)' : ''}</option>) : <option value="">No releases yet</option>}</select><ChevronDown size={15} /></div>
     <fieldset className="format-fieldset" disabled={Boolean(busy) || !available}><legend>Plugin formats</legend><div className="format-options">{plugin.formats.map(format => <label className={`format-option ${formats.includes(format) ? 'checked' : ''}`} key={format}><input type="checkbox" checked={formats.includes(format)} onChange={() => toggleFormat(format)} /><span className="checkbox-mark">{formats.includes(format) && <Check size={11} strokeWidth={2.4} />}</span><span>{format}</span></label>)}</div></fieldset>
@@ -434,7 +455,38 @@ function PluginDetail({ plugin, state, busy, progress, openExternal, install, un
     <div className="detail-links"><button onClick={() => void openExternal(plugin.url)}><Github size={14} /><span>View project</span><ArrowUpRight size={13} /></button>{release && <button onClick={() => void openExternal(release.url)}><ExternalLink size={14} /><span>Release notes</span><ArrowUpRight size={13} /></button>}</div>
     {confirmRemove && <ConfirmDialog title={`Remove ${plugin.name}?`} description={`This removes ${plugin.name} (${plugin.installed.map(item => item.format).join(' and ')}) from your computer.`} cancelLabel="Keep plugin" actionLabel="Remove plugin" danger={true} busy={Boolean(busy)} onCancel={() => setConfirmRemove(false)} onConfirm={async () => { if (await uninstall(plugin.installed.map(item => item.format), { unmanaged: true })) setConfirmRemove(false); }} />}
     {confirmReplace && <ConfirmDialog title={`Replace existing ${plugin.name}?`} description={`An unmanaged ${formats.join(', ')} plugin already exists in your installation folder. OpenVST Manager will replace it with version ${formatVersion(release?.tag ?? '')} and manage it.`} cancelLabel="Keep existing" actionLabel="Replace and install" danger={false} busy={Boolean(busy)} onCancel={() => setConfirmReplace(false)} onConfirm={async () => { if (release && await install(release.tag, formats, { overwrite: true })) setConfirmReplace(false); }} />}
+    {showScreenshotModal && plugin.screenshotUrl && <ScreenshotDialog name={plugin.name} src={plugin.screenshotUrl} onClose={() => setShowScreenshotModal(false)} />}
   </aside>;
+}
+
+function ScreenshotDialog({ name, src, onClose }: { name: string; src: string; onClose: () => void }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dialog = ref.current;
+    dialog?.showModal();
+    return () => dialog?.close();
+  }, []);
+  return (
+    <dialog
+      ref={ref}
+      className="confirm-dialog screenshot-dialog"
+      onCancel={event => { event.preventDefault(); onClose(); }}
+      onClick={event => { if (event.target === event.currentTarget) onClose(); }}
+      aria-labelledby="screenshot-dialog-title"
+    >
+      <div className="screenshot-dialog-content">
+        <div className="screenshot-dialog-header">
+          <h2 id="screenshot-dialog-title">{name}</h2>
+          <button autoFocus type="button" className="button button-secondary button-small" onClick={onClose}>
+            <X size={13} />Close
+          </button>
+        </div>
+        <div className="screenshot-dialog-stage">
+          <img src={src} alt={`${name} full size interface preview`} />
+        </div>
+      </div>
+    </dialog>
+  );
 }
 
 function ConfirmDialog({ title, description, busy, actionLabel = 'Remove plugin', cancelLabel = 'Keep plugin', danger = true, onCancel, onConfirm }: {
@@ -949,7 +1001,7 @@ function SettingsPanel({ state, manager, busy, save, onError, openExternal, oper
       </div>
 
       <div className="about-settings">
-        <AudioLines size={21} strokeWidth={1.5} />
+        <BrandMark size={22} />
         <div>
           <span>OpenVST Manager {state.appVersion}</span>
           <p>{platformName(state.platform)} {state.arch}</p>

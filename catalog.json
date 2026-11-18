@@ -8,7 +8,8 @@
     "bundleNames": {
       "VST3": "openEDMDelay.vst3",
       "AU": "openEDMDelay.component"
-    }
+    },
+    "screenshotPath": "docs/screenshots/preview.png"
   },
   {
     "id": "openWallLimiter",
@@ -19,7 +20,8 @@
     "bundleNames": {
       "VST3": "openWallLimiter.vst3",
       "AU": "openWallLimiter.component"
-    }
+    },
+    "screenshotPath": "docs/screenshots/preview.png"
   },
   {
     "id": "openGlitchFX",
@@ -29,7 +31,8 @@
     "category": "Creative",
     "bundleNames": {
       "VST3": "openGlitchFX.vst3"
-    }
+    },
+    "screenshotPath": "docs/screenshots/preview.png"
   },
   {
     "id": "openEDMFilter",
@@ -40,7 +43,8 @@
     "bundleNames": {
       "VST3": "openEDMFilter.vst3",
       "AU": "openEDMFilter.component"
-    }
+    },
+    "screenshotPath": "docs/screenshots/preview.png"
   },
   {
     "id": "openEDMKick",
@@ -60,7 +64,8 @@
         "openKicker.component",
         "openEDMKick.component"
       ]
-    }
+    },
+    "screenshotPath": "docs/screenshots/preview.png"
   },
   {
     "id": "openFruit",
@@ -71,7 +76,8 @@
     "bundleNames": {
       "VST3": "openFruit.vst3",
       "AU": "openFruit.component"
-    }
+    },
+    "screenshotPath": "docs/screenshots/preview.png"
   },
   {
     "id": "openClapper",
@@ -82,7 +88,8 @@
     "bundleNames": {
       "VST3": "openClapper.vst3",
       "AU": "openClapper.component"
-    }
+    },
+    "screenshotPath": "docs/screenshots/preview.png"
   },
   {
     "id": "openSmacker",
@@ -93,7 +100,8 @@
     "bundleNames": {
       "VST3": "openSmacker.vst3",
       "AU": "openSmacker.component"
-    }
+    },
+    "screenshotPath": "docs/screenshots/preview.png"
   },
   {
     "id": "openHatter",
@@ -104,7 +112,8 @@
     "bundleNames": {
       "VST3": "openHatter.vst3",
       "AU": "openHatter.component"
-    }
+    },
+    "screenshotPath": "docs/screenshots/preview.png"
   },
   {
     "id": "openSausage",
@@ -115,7 +124,8 @@
     "bundleNames": {
       "VST3": "openSausage.vst3",
       "AU": "openSausage.component"
-    }
+    },
+    "screenshotPath": "docs/screenshots/preview.png"
   },
   {
     "id": "openDucker",
@@ -126,7 +136,8 @@
     "bundleNames": {
       "VST3": "openDucker.vst3",
       "AU": "openDucker.component"
-    }
+    },
+    "screenshotPath": "docs/screenshots/preview.png"
   },
   {
     "id": "openTunerEQ",
@@ -137,7 +148,8 @@
     "bundleNames": {
       "VST3": "openTunerEQ.vst3",
       "AU": "openTunerEQ.component"
-    }
+    },
+    "screenshotPath": "docs/screenshots/preview.png"
   },
   {
     "id": "openBassSpace",
@@ -158,7 +170,8 @@
         "openBassSpace.component",
         "openMaster.component"
       ]
-    }
+    },
+    "screenshotPath": "docs/screenshots/preview.png"
   },
   {
     "id": "winamp-classic-equalizer-vst",
@@ -169,6 +182,7 @@
     "bundleNames": {
       "VST3": "Winamp Classic Equalizer.vst3"
     },
+    "screenshotPath": "docs/screenshots/preview.png",
     "notice": "See the project README for provenance and usage terms."
   },
   {
@@ -180,6 +194,7 @@
     "bundleNames": {
       "VST3": "Winamp Classic Visualizer.vst3"
     },
+    "screenshotPath": "docs/screenshots/preview.png",
     "notice": "See the project README for provenance and usage terms."
   }
 ]

@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   check:
-    runs-on: ubuntu-24.04
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -21,12 +21,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
-      - name: Harden DNS and mirrors for apt
-        run: |
-          echo "nameserver 8.8.8.8" | sudo tee /etc/resolv.conf > /dev/null
-          echo 'Acquire::ForceIPv4 "true";' | sudo tee /etc/apt/apt.conf.d/99force-ipv4
-          sudo grep -rl "azure.archive.ubuntu.com" /etc/apt/ 2>/dev/null | xargs -r sudo sed -i 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g'
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install chromium
       - run: npm run test:ui
   package:
     needs: check
@@ -34,8 +29,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-15
-            target: mac
           - os: windows-latest
             target: win
     runs-on: ${{ matrix.os }}
@@ -54,14 +47,12 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: manager-${{ matrix.target }}
-          path: |
-            release/*.dmg
-            release/*.exe
+          path: release/*.exe
           if-no-files-found: error
   release:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [check, package]
-    runs-on: ubuntu-24.04
+    runs-on: windows-latest
     permissions:
       contents: write
     steps:
@@ -71,6 +62,7 @@ jobs:
           merge-multiple: true
       - name: Checksums
         working-directory: artifacts
+        shell: bash
         run: sha256sum * > SHA256SUMS.txt
       - uses: softprops/action-gh-release@v2
         with:
@@ -80,6 +72,5 @@ jobs:
           body: |
             Install, update and manage Alan Marcero's audio plugins directly from GitHub Releases.
 
-            macOS: choose arm64 for Apple Silicon or x64 for Intel. Builds are ad-hoc signed, not Apple-notarized; see the README for first-launch instructions.
             Windows: download the x64 setup EXE. This build is unsigned, so Windows may show a publisher warning.
-            Linux: build from source using the README. No prebuilt Linux binaries are published.
+            macOS and Linux prebuilt packages are disabled for now; build from source using the README.
