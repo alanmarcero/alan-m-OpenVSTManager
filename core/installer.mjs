@@ -51,6 +51,11 @@ function sameIdentity(info, identity) {
   return info && !info.isSymbolicLink() && String(info.dev) === String(identity.dev) && String(info.ino) === String(identity.ino);
 }
 
+function sameFsPath(a, b, platform = process.platform) {
+  if (!a || !b) return false;
+  return platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b;
+}
+
 function validIdentityPart(value) {
   return (Number.isSafeInteger(value) && value >= 0)
     || (typeof value === 'string' && /^(0|[1-9][0-9]{0,19})$/.test(value) && BigInt(value) <= 0xffffffffffffffffn);
@@ -175,8 +180,8 @@ export class Installer {
   }
 
   setBackupFolder(backupFolder) {
-    if (backupFolder && typeof backupFolder === 'string') {
-      this.backupFolder = path.resolve(backupFolder);
+    if (typeof backupFolder === 'string' && backupFolder.trim()) {
+      this.backupFolder = path.resolve(backupFolder.trim());
     } else {
       this.backupFolder = path.join(this.dataDir, 'backups');
     }
@@ -186,8 +191,8 @@ export class Installer {
     if (!paths || typeof paths !== 'object' || Array.isArray(paths)) throw new Error('Invalid plugin paths');
     const updated = { ...this.paths };
     for (const [format, directory] of Object.entries(paths)) {
-      if (!FORMATS.includes(format) || typeof directory !== 'string' || !path.isAbsolute(directory) || directory.includes('\0')) throw new Error(`Invalid installation path for ${format}`);
-      updated[format] = path.resolve(directory);
+      if (!FORMATS.includes(format) || typeof directory !== 'string' || !directory.trim() || !path.isAbsolute(directory.trim()) || directory.includes('\0')) throw new Error(`Invalid installation path for ${format}`);
+      updated[format] = path.resolve(directory.trim());
     }
     this.paths = updated;
   }
@@ -364,7 +369,10 @@ export class Installer {
               delete receipts.installs[found.key];
               receiptsModified = true;
             }
-            const locationMismatch = Boolean(managed && this.paths[format] && path.resolve(record.root) !== path.resolve(this.paths[format]));
+            const configuredRoot = this.paths[format]
+              ? await fs.realpath(this.paths[format]).catch(() => path.resolve(this.paths[format]))
+              : null;
+            const locationMismatch = Boolean(managed && configuredRoot && !sameFsPath(path.resolve(record.root), configuredRoot, this.platform));
             installed.push({ format, version: managed ? record.version : null, path: record.path, managed, ...(locationMismatch ? { locationMismatch: true } : {}) });
             seen.add(record.path);
           }
@@ -425,7 +433,7 @@ export class Installer {
           let changePrevious = previous;
           const targetInfo = await exists(target);
           if (targetInfo) {
-            const isOwnedPrevious = previous && previous.path === target && await ownsRecord(previous);
+            const isOwnedPrevious = previous && sameFsPath(previous.path, target, this.platform) && await ownsRecord(previous);
             if (!isOwnedPrevious) {
               if (!overwrite) throw new Error(`An unmanaged plugin already exists at ${target}. Move it before installing with OpenVST Manager.`);
               changePrevious = {
@@ -437,7 +445,7 @@ export class Installer {
                 version: 'existing',
                 identity: identity(targetInfo),
               };
-              if (previous && previous.path !== target && await exists(previous.path)) {
+              if (previous && !sameFsPath(previous.path, target, this.platform) && await exists(previous.path)) {
                 extraCleanups.push(previous.path);
               }
             }
@@ -470,7 +478,7 @@ export class Installer {
         const bundleName = previous?.bundleName || bundleNames(plugin, format)[0];
         const target = path.join(root, bundleName);
 
-        if (previous && previous.path === target && await exists(target)) {
+        if (previous && sameFsPath(previous.path, target, this.platform) && await exists(target)) {
           continue;
         }
 

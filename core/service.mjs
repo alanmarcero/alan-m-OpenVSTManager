@@ -44,14 +44,15 @@ export class ManagerService {
       const defaultBackup=path.join(this.dataDir,'backups');
       const resolvedBackup=typeof saved.backupFolder==='string'&&saved.backupFolder.trim()?saved.backupFolder.trim():defaultBackup;
       if(this.installer.setBackupFolder) this.installer.setBackupFolder(resolvedBackup);
-      if(this.client.setToken) this.client.setToken(saved.githubToken);
+      const resolvedToken=typeof saved.githubToken==='string'?saved.githubToken.trim():'';
+      if(this.client.setToken) this.client.setToken(resolvedToken);
       this.settings={
         includePrereleases:saved.includePrereleases ?? false,
         autoCheckAppUpdates:saved.autoCheckAppUpdates ?? true,
         paths:{...this.installer.paths},
         backupFolder:resolvedBackup,
         preferredFormats:Array.isArray(saved.preferredFormats) ? saved.preferredFormats : (this.platform==='darwin'?['VST3','AU']:['VST3']),
-        githubToken:saved.githubToken || '',
+        githubToken:resolvedToken,
       };
       await this.cleanupTempDownloads().catch(()=>{});
     })();
@@ -191,22 +192,24 @@ export class ManagerService {
     if(patch.paths!==undefined){
       if(!patch.paths || typeof patch.paths!=='object' || Array.isArray(patch.paths))throw new Error('Invalid plugin folders.');
       for(const [format,folder] of Object.entries(patch.paths)){
-        if(!['VST3','AU'].includes(format)||typeof folder!=='string'||!path.isAbsolute(folder)||folder.includes('\0'))throw new Error('Choose an absolute plugin folder.');
+        if(!['VST3','AU'].includes(format)||typeof folder!=='string'||!folder.trim()||!path.isAbsolute(folder.trim())||folder.includes('\0'))throw new Error('Choose an absolute plugin folder.');
       }
     }
   }
   async saveSettings(patch){
     if(this.busy)throw new Error('Wait for the current installation to finish before changing folders.');
     await this.init();this.validateSettings(patch);
+    const trimmedPaths=patch.paths?Object.fromEntries(Object.entries(patch.paths).map(([f,p])=>[f,p.trim()])):{};
     const defaultBackup=path.join(this.dataDir,'backups');
     const nextBackupFolder=patch.backupFolder!==undefined?(patch.backupFolder.trim()||defaultBackup):this.settings.backupFolder;
+    const nextToken=patch.githubToken!==undefined?patch.githubToken.trim():this.settings.githubToken;
     const next={
       includePrereleases:patch.includePrereleases ?? this.settings.includePrereleases,
       autoCheckAppUpdates:patch.autoCheckAppUpdates ?? this.settings.autoCheckAppUpdates,
-      paths:{...this.settings.paths,...patch.paths},
+      paths:{...this.settings.paths,...trimmedPaths},
       backupFolder:nextBackupFolder,
       preferredFormats:patch.preferredFormats ?? this.settings.preferredFormats,
-      githubToken:patch.githubToken ?? this.settings.githubToken,
+      githubToken:nextToken,
     };
     this.installer.setPaths(next.paths);
     if(this.installer.setBackupFolder) this.installer.setBackupFolder(next.backupFolder);
@@ -220,11 +223,12 @@ export class ManagerService {
     }
     const tokenChanged=next.githubToken!==this.settings.githubToken;
     const enabledAutoCheck=!this.settings.autoCheckAppUpdates && next.autoCheckAppUpdates;
+    const prereleaseChanged=next.includePrereleases!==this.settings.includePrereleases;
     this.settings=next;
     if(this.loaded && tokenChanged){
       return this.refresh();
     }
-    if(this.loaded && enabledAutoCheck){
+    if(this.loaded && (enabledAutoCheck || (prereleaseChanged && next.autoCheckAppUpdates))){
       await this.checkAppUpdate({force:false}).catch(()=>{});
     }
     return this.getState();

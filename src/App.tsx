@@ -375,7 +375,7 @@ export function App() {
         : loading ? <div className="loading-layout" role="status" aria-label="Loading plugin library"><div className="loading-toolbar" /><div className="loading-rows">{Array.from({ length: 7 }, (_, index) => <div className="loading-row" key={index}><i /><span /><b /></div>)}</div><p><LoaderCircle className="spin" size={15} />Loading your collection</p></div>
           : loadError || !state ? <div className="state-screen"><span className="state-symbol"><CircleAlert size={31} strokeWidth={1.5} /></span><h2>Couldn’t open your library</h2><p>{loadError || 'The desktop app did not return a library.'}</p><button className="button button-primary" onClick={() => void load()}>Try again</button></div>
             : <>
-              {(state.offline || state.error) && <div className="connection-notice" role="status">{state.offline ? <WifiOff size={17} /> : <CircleAlert size={17} />}<span>{state.error || 'You’re offline. Showing your saved releases; reconnect to check for updates.'}</span></div>}
+              {(state.offline || state.error) && <div className="connection-notice" role="status">{state.offline ? <WifiOff size={17} /> : <CircleAlert size={17} />}<span>{state.error || 'You’re offline. Showing your saved releases; reconnect to check for updates.'}</span>{!state.offline && view !== 'settings' && /Settings/i.test(state.error || '') && <button type="button" className="button button-secondary button-small notice-action" onClick={() => navigate('settings')}>Open Settings</button>}</div>}
               {view === 'settings' ? <SettingsPanel key={JSON.stringify(state.settings)} state={state} manager={manager} busy={busy} save={settings => operate('settings', 'Saving settings', () => manager.saveSettings(settings), 'Settings saved.')} onError={message => setNotice({ kind: 'error', message })} onNotice={setNotice} openExternal={openExternal} onOpenFolder={manager.openFolder ? openFolder : undefined} onInstallManagerUpdate={installManagerUpdate} operate={operate} />
                 : <>
                   {showToolbar && <section className="library-toolbar" aria-label="Filter plugins"><div className="toolbar-filters"><div className="search-field"><Search size={17} /><input ref={searchInputRef} value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Escape' && query) { event.stopPropagation(); setQuery(''); } }} placeholder="Search plugins" aria-label="Search plugins" />{query && <button className="icon-button clear-search" aria-label="Clear search" onClick={() => setQuery('')}><X size={14} /></button>}</div><div className="category-select"><SlidersHorizontal size={15} /><select aria-label="Category" value={category} onChange={event => setCategory(event.target.value)}><option value="All categories">All categories</option>{categories.map(item => <option key={item} value={item}>{item} ({categoryCounts.get(item) ?? 0})</option>)}</select><ChevronDown size={13} /></div><div className="category-select sort-select"><ArrowUpDown size={14} /><select aria-label="Sort" value={sortBy} onChange={event => setSortBy(event.target.value as SortMode)}><option value="catalog">Default order</option><option value="name">Name (A–Z)</option><option value="updated">Recently updated</option></select><ChevronDown size={13} /></div></div><div className="toolbar-actions">{uninstalledCount > 0 && view === 'library' && <button className="button button-primary install-all" title={`Install ${uninstalledCount} uninstalled plugins`} disabled={Boolean(busy)} onClick={() => void installAll()}>{isInstallingAll ? <LoaderCircle size={15} className="spin" /> : <Download size={15} />}{isInstallingAll ? 'Installing all…' : 'Install all'}</button>}{updateCount > 0 && (view === 'updates' || view === 'installed' || view === 'library') && <button className={`button ${uninstalledCount > 0 && view === 'library' ? 'button-secondary' : 'button-primary'} update-all`} title={`Update ${updateCount} plugins`} disabled={Boolean(busy)} onClick={() => void updateAll()}>{isUpdatingAll ? <LoaderCircle size={15} className="spin" /> : (uninstalledCount > 0 && view === 'library' ? <RefreshCw size={14} /> : <Download size={15} />)}{isUpdatingAll ? 'Updating all…' : 'Update all'}</button>}{installedCount > 0 && (view === 'installed' || view === 'updates') && <button className="button button-danger uninstall-all" disabled={Boolean(busy)} onClick={() => setConfirmUninstallAll(true)}><Trash2 size={15} />Uninstall all</button>}<span className="result-count">{sortedVisible.length}{sortedVisible.length !== tabPlugins.length ? ` of ${tabPlugins.length}` : ''} {sortedVisible.length === 1 && sortedVisible.length === tabPlugins.length ? 'plugin' : 'plugins'}</span></div></section>}
@@ -545,7 +545,7 @@ function PluginDetail({ plugin, state, busy, progress, openExternal, onOpenFolde
   }
   const releaseSizeLabel = formatBytes(releaseBytes);
   const releaseDateLabel = release?.publishedAt ? new Date(release.publishedAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : '';
-  const releaseMeta = [releaseDateLabel, releaseSizeLabel].filter(Boolean).join(' · ');
+  const releaseMeta = [release?.prerelease ? 'Pre-release' : '', releaseDateLabel, releaseSizeLabel].filter(Boolean).join(' · ');
 
   return <aside className="plugin-detail" aria-label={`${plugin.name} details`}>
     <div className="detail-heading"><PluginGlyph id={plugin.id} large /><span className="detail-category">{plugin.category}</span></div>
@@ -582,7 +582,7 @@ function PluginDetail({ plugin, state, busy, progress, openExternal, onOpenFolde
       </section>
     )}
     <div className="version-label"><label htmlFor={`release-${plugin.id}`}>Release</label>{releaseMeta && <span>{releaseMeta}</span>}</div>
-    <div className="release-select"><select id={`release-${plugin.id}`} value={release?.tag ?? ''} onChange={event => setTag(event.target.value)} disabled={!plugin.releases.length || Boolean(busy)}>{plugin.releases.length ? plugin.releases.map((item, index) => <option key={item.tag} value={item.tag}>Version {formatVersion(item.tag)}{index === 0 ? ' (latest)' : ''}</option>) : <option value="">No releases yet</option>}</select><ChevronDown size={15} /></div>
+    <div className="release-select"><select id={`release-${plugin.id}`} value={release?.tag ?? ''} onChange={event => setTag(event.target.value)} disabled={!plugin.releases.length || Boolean(busy)}>{plugin.releases.length ? plugin.releases.map((item, index) => <option key={item.tag} value={item.tag}>Version {formatVersion(item.tag)}{item.prerelease ? ' (pre-release)' : index === 0 ? ' (latest)' : ''}</option>) : <option value="">No releases yet</option>}</select><ChevronDown size={15} /></div>
     {release && hasReleaseNotesContent(release.notes) && (!pluginHasUpdate || release.tag !== updateRelease?.tag) && (
       <div className="detail-release-notes-wrap">
         <button type="button" className="notes-toggle detail-notes-toggle" aria-expanded={showSelectedNotes} onClick={() => setShowSelectedNotes(open => !open)}>
@@ -596,7 +596,7 @@ function PluginDetail({ plugin, state, busy, progress, openExternal, onOpenFolde
         )}
       </div>
     )}
-    <fieldset className="format-fieldset" disabled={Boolean(busy) || !available}><legend>Plugin formats</legend><div className="format-options">{plugin.formats.map(format => <label className={`format-option ${formats.includes(format) ? 'checked' : ''}`} key={format}><input type="checkbox" checked={formats.includes(format)} onChange={() => toggleFormat(format)} /><span className="checkbox-mark">{formats.includes(format) && <Check size={11} strokeWidth={2.4} />}</span><span>{format}</span></label>)}</div></fieldset>
+    <fieldset className="format-fieldset" disabled={Boolean(busy) || !available}><legend>Plugin formats</legend><div className="format-options">{plugin.formats.map(format => <label className={`format-option ${formats.includes(format) ? 'checked' : ''}`} key={format}><input type="checkbox" checked={formats.includes(format)} onChange={() => toggleFormat(format)} /><span className="checkbox-mark">{formats.includes(format) && <Check size={11} strokeWidth={2.4} />}</span><span>{format}</span></label>)}</div>{available && formats.length === 0 && <p className="inline-hint">Select at least one format above to continue.</p>}</fieldset>
     {available ? (
       <div className="install-actions">
         <button className="button button-primary install-button" disabled={Boolean(busy) || formats.length === 0 || sameVersion} onClick={handleInstallClick}>
@@ -1289,7 +1289,16 @@ function SettingsPanel({ state, manager, busy, save, onError, onNotice, openExte
               formats.some(format => !isAbsolutePath(draft.paths[format] || '')) ||
               (Boolean(draft.backupFolder.trim()) && !isAbsolutePath(draft.backupFolder))
             }
-            onClick={() => void save(draft)}
+            onClick={() =>
+              void save({
+                ...draft,
+                paths: Object.fromEntries(
+                  Object.entries(draft.paths).map(([format, folder]) => [format, (folder || '').trim()])
+                ) as Record<PluginFormat, string>,
+                backupFolder: (draft.backupFolder || '').trim(),
+                githubToken: (draft.githubToken || '').trim(),
+              })
+            }
           >
             {busy?.id === 'settings' ? <LoaderCircle size={15} className="spin" /> : <Check size={15} />}
             Save changes

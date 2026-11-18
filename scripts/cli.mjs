@@ -14,7 +14,7 @@ const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const {values,positionals}=parseArgs({allowPositionals:true,options:{format:{type:'string',default:'VST3'},version:{type:'string'},'data-dir':{type:'string'},overwrite:{type:'boolean'},json:{type:'boolean'},help:{type:'boolean'}}});
 const [command='list',id,folder]=positionals;
 if(values.help){
-  console.log('OpenVST Manager\n\nlist [--json]\ninstalled [--json]\nupdates [--json]\nrefresh [--json]\ninstall <plugin> [--version <tag>] [--format VST3|AU] [--overwrite]\ninstall-all [--overwrite]\nupdate-all [--overwrite]\nmove <plugin> [--format VST3|AU] [--overwrite]\nmove-all\nuninstall <plugin> [--format VST3|AU]\nuninstall-all\npaths [VST3|AU <folder>] [--json]\nlog [--json]\nclear-cache\n\n--data-dir <folder> uses an isolated settings/receipt directory.');
+  console.log('OpenVST Manager\n\nlist [--json]\ninstalled [--json]\nupdates [--json]\nrefresh [--json]\ninstall <plugin> [--version <tag>] [--format VST3|AU] [--overwrite]\ninstall-all [--overwrite]\nupdate-all [--overwrite]\nmove <plugin> [--format VST3|AU] [--overwrite]\nmove-all\nuninstall <plugin> [--format VST3|AU]\nuninstall-all\npaths [VST3|AU <folder>] [--json]\ncheck-update [--json]\nlog [--json]\nclear-log\nclear-cache\n\n--data-dir <folder> uses an isolated settings/receipt directory.');
   process.exit(0);
 }
 const config=process.platform==='darwin'?path.join(homedir(),'Library','Application Support'):process.platform==='win32'?(process.env.APPDATA||path.join(homedir(),'AppData','Roaming')):(process.env.XDG_CONFIG_HOME||path.join(homedir(),'.config'));
@@ -30,9 +30,17 @@ try{
     const lines=await manager.getActivityLog();
     if(values.json)console.log(JSON.stringify(lines,null,2));
     else for(const line of lines)console.log(line);
+  }else if(command==='clear-log'){
+    await manager.clearActivityLog();
+    console.log('Activity log cleared.');
   }else if(command==='clear-cache'){
     const next=await manager.clearCache();
     console.log(`Refreshed ${next.plugins.length} plugins.`);
+  }else if(command==='check-update'){
+    const update=await manager.checkAppUpdate({force:true});
+    if(values.json)console.log(JSON.stringify(update,null,2));
+    else if(update.error)throw new Error(update.error);
+    else console.log(update.available?`Update available: ${update.latestVersion} (current ${update.currentVersion})`:`Up to date (${update.currentVersion})`);
   }else{
     const state=command==='refresh'?await manager.refresh():await manager.getState();
     if(command==='list'||command==='refresh'||command==='installed'||command==='updates'){

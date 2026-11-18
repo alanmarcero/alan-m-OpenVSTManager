@@ -384,3 +384,48 @@ test('installAll respects preferredFormats, blank backupFolder resets to default
   assert.deepEqual(installedFormats, ['AU']);
   assert.ok(detectCalls >= 1);
 });
+
+test('saveSettings trims folder paths and re-checks app updates when includePrereleases changes', async t => {
+  const dataDir = await mkdtemp(path.join(tmpdir(), 'openvst-service-trim-'));
+  t.after(() => rm(dataDir, { recursive: true, force: true }));
+
+  const plugin = { id: 'openA', repo: 'openA', name: 'Alpha', description: 'FX', category: 'FX', bundleNames: { VST3: 'openA.vst3' } };
+  let appChecks = 0;
+  const client = {
+    catalog: async () => ({ data: [plugin], stale: false }),
+    releases: async () => ({ data: [], stale: false, fetchedAt: 12345 }),
+    appReleases: async () => {
+      appChecks++;
+      return {
+        data: [{
+          tag_name: 'v2.0.0-beta.1',
+          prerelease: true,
+          assets: [{ name: 'OpenVSTManager-2.0.0-beta.1-win-x64.exe', browser_download_url: 'https://github.com/alanmarcero/alan-m-OpenVSTManager/releases/download/v2.0.0-beta.1/OpenVSTManager-2.0.0-beta.1-win-x64.exe', size: 100 }],
+        }],
+        stale: false,
+        fetchedAt: 12345,
+      };
+    },
+  };
+  const installer = { paths: { VST3: '/tmp/plugins' }, setPaths(p) { this.paths = { ...this.paths, ...p }; }, detect: async () => [] };
+  const service = new ManagerService({
+    dataDir, client, installer, platform: 'win32', arch: 'x64',
+    appVersion: '1.4.4', bundledCatalog: [plugin],
+  });
+
+  const s1 = await service.getState();
+  assert.equal(s1.appUpdate.available, false);
+  assert.equal(appChecks, 1);
+
+  const customPath = path.join(dataDir, 'custom-vst3');
+  const s2 = await service.saveSettings({
+    paths: { VST3: `  ${customPath}  ` },
+    githubToken: '  ghp_trimmed  ',
+    includePrereleases: true,
+  });
+  assert.equal(s2.settings.paths.VST3, path.resolve(customPath));
+  assert.equal(s2.settings.githubToken, 'ghp_trimmed');
+  assert.equal(appChecks, 2);
+  assert.equal(s2.appUpdate.available, true);
+  assert.equal(s2.appUpdate.latestVersion, '2.0.0-beta.1');
+});

@@ -303,8 +303,9 @@ test('supports sorting, alias search, keyboard focus, detail release notes, form
 
   await page.evaluate(() => {
     const bass = window.__managerTest.state.plugins.find(p => p.id === 'openBassSpace')!;
-    bass.releases[0].notes = '### Changes\n\n---\n\n1. Added *stereo* width mode. See [guide](https://example.com).\n2. Tightened low-end mono.';
-    window.__managerTest.state.error = 'GitHub rate limit reached. Try again later.';
+    bass.releases[0].prerelease = true;
+    bass.releases[0].notes = '### Changes\n\n---\n\n> Important note\n\n1. Added *stereo* width mode in https://github.com/alanmarcero/openBassSpace/pull/12. See [guide](https://example.com).\n2. Tightened low-end mono.';
+    window.__managerTest.state.error = 'GitHub rate limit reached. Add a GitHub Token in Settings.';
     window.__managerTest.state.offline = false;
     window.__managerTest.state.appUpdate = {
       available: true,
@@ -316,6 +317,7 @@ test('supports sorting, alias search, keyboard focus, detail release notes, form
   });
   await page.getByRole('button', { name: 'Check for updates', exact: true }).click();
   await expect(page.getByRole('status').filter({ hasText: 'GitHub rate limit reached.' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Open Settings', exact: true })).toBeVisible();
   await expect(page.locator('.last-checked')).not.toContainText('Offline');
   await expect(page.getByRole('combobox', { name: 'Category' })).toContainText(/Mastering \(\d+\)/);
 
@@ -327,14 +329,21 @@ test('supports sorting, alias search, keyboard focus, detail release notes, form
   await expectSeparatedControls(page);
 
   await page.getByRole('button', { name: /openBassSpace Mastering/ }).click();
-  await expect(page.locator('.version-label')).toContainText('1 KB');
+  await expect(page.locator('.version-label')).toContainText('Pre-release ·');
+  await expect(page.locator('#release-openBassSpace')).toContainText('(pre-release)');
   const detailToggle = page.getByRole('button', { name: 'Release notes for v1.0.0' });
   await detailToggle.click();
   const detailNotes = page.getByRole('region', { name: 'Release notes for version 1.0.0' });
   await expect(detailNotes.locator('ol li')).toHaveCount(2);
-  await expect(detailNotes).toContainText('Added stereo width mode. See guide.');
+  await expect(detailNotes).toContainText('Important note');
+  await expect(detailNotes).toContainText('(#12)');
+  await expect(detailNotes).toContainText('Added stereo width mode');
   await expect(detailNotes).not.toContainText('---');
   await expect(detailNotes).not.toContainText('https://example.com');
+
+  await page.locator('.format-option input[type="checkbox"]').first().click();
+  await page.locator('.format-option input[type="checkbox"]').nth(1).click();
+  await expect(page.getByText('Select at least one format above to continue.')).toBeVisible();
 
   await page.getByRole('button', { name: 'Update to v1.4.0' }).click();
   const updateDialog = page.getByRole('dialog', { name: 'Update OpenVST Manager' });

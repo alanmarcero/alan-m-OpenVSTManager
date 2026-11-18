@@ -486,3 +486,18 @@ test('detects unmanaged VST3 versions from moduleinfo.json including 4-part Wind
   assert.equal(detected[0].managed, false);
   assert.equal(detected[0].version, 'v1.5.0');
 });
+
+test('setBackupFolder resets on whitespace and Windows locationMismatch ignores path casing', async (t) => {
+  const f = await fixture(t);
+  const winInstaller = new Installer({ dataDir: f.dataDir, paths: f.paths, backupFolder: '   ', platform: 'win32', plugins: [plugin] });
+  assert.equal(winInstaller.backupFolder, path.join(f.dataDir, 'backups'));
+  await winInstaller.install({ plugin, tag: 'v1.0.0', formats: ['VST3'], ...await f.archive() });
+  const oppositeCase = f.paths.VST3.replace(/[a-z]/gi, ch => (ch === ch.toLowerCase() ? ch.toUpperCase() : ch.toLowerCase()));
+  winInstaller.setPaths({ VST3: ` ${oppositeCase} ` });
+  const detected = await winInstaller.detect(plugin);
+  assert.equal(detected.length, 1);
+  assert.equal(detected[0].managed, true);
+  if (process.platform === 'win32') {
+    assert.equal(detected[0].locationMismatch, undefined);
+  }
+});
