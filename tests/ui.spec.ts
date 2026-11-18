@@ -275,6 +275,15 @@ test('shows latest release notes when updates exist, renders auto-updating scree
   await page.getByRole('button', { name: 'Hide full notes' }).click();
   await expect(fullNotes).toHaveCount(0);
   await expectSeparatedControls(page);
+
+  await page.getByRole('button', { name: 'Installed plugins', exact: true }).click();
+  await expect(page.locator('.plugin-row .plugin-update-summary')).toContainText('Adds analog drive curves and LFO sync refinements.');
+  await page.getByRole('button', { name: 'Expand all notes', exact: true }).click();
+  const installedNotes = page.getByRole('region', { name: /Full release notes for openEDMFilter/ });
+  await expect(installedNotes).toContainText('Improved filter envelope tracking.');
+  await expectSeparatedControls(page);
+  await page.getByRole('button', { name: 'Collapse all notes', exact: true }).click();
+  await expect(installedNotes).toHaveCount(0);
 });
 
 test('supports sorting, alias search, keyboard focus, detail release notes, formatted update modal, and path validation', async ({ page }) => {
@@ -348,4 +357,29 @@ test('supports sorting, alias search, keyboard focus, detail release notes, form
   await page.getByRole('button', { name: 'Clear log' }).click();
   await expect(page.getByText('No activity recorded yet.')).toBeVisible();
   await expectSeparatedControls(page);
+
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('heading', { name: 'Library' })).toBeVisible();
+  await page.keyboard.press('Control+,');
+  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  await page.evaluate(() => {
+    const bass = window.__managerTest.state.plugins.find(p => p.id === 'openBassSpace')!;
+    bass.error = 'GitHub rate limit reached. Try again later.';
+    const filter = window.__managerTest.state.plugins.find(p => p.id === 'openEDMFilter')!;
+    filter.installed = [{ format: 'VST3', version: 'v1.0.0', path: '/tmp/openvst-test/existing.vst3', managed: true }];
+  });
+  await page.getByRole('button', { name: 'Check for updates', exact: true }).click();
+  await expect(page.getByRole('button', { name: /openBassSpace Mastering/ })).not.toContainText('Release unavailable');
+
+  const searchBox = page.getByRole('textbox', { name: 'Search plugins' });
+  await searchBox.fill('openMaster');
+  await expect(page.locator('.result-count')).toHaveText(`1 of ${catalog.length} plugins`);
+  await searchBox.press('Escape');
+
+  await page.getByRole('button', { name: 'Installed plugins', exact: true }).click();
+  await expect(page.locator('.plugin-row .plugin-update-summary')).toContainText('Adds analog drive curves and LFO sync refinements.');
+  await page.getByRole('button', { name: 'Show full notes' }).click();
+  await expect(page.getByRole('region', { name: /Full release notes for openEDMFilter 1\.0\.0/ })).toContainText('Improved filter envelope tracking.');
 });

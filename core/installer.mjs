@@ -633,7 +633,8 @@ export class Installer {
         for (const change of journal.changes) {
           if (change.backup && await exists(change.backup)) {
             try {
-              const archiveDir = path.join(this.backupFolder, `${change.previous.pluginId}-${change.previous.version || 'backup'}`);
+              const safeVer = String(change.previous.version || 'backup').replace(/[^a-zA-Z0-9._-]/g, '_');
+              const archiveDir = path.join(this.backupFolder, `${change.previous.pluginId}-${safeVer}`);
               await fs.mkdir(archiveDir, { recursive: true });
               await fs.cp(change.backup, path.join(archiveDir, change.previous.bundleName), { recursive: true, force: true });
             } catch { /* Backups to external folder are best-effort */ }

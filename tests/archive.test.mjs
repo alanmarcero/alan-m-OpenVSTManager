@@ -46,7 +46,7 @@ test('extracts nested bundles and preserves executable permissions', async (t) =
   if (process.platform !== 'win32') assert.equal((await stat(binary)).mode & 0o777, 0o755);
 });
 
-for (const name of ['../escape', '/absolute', 'C:/escape', 'dir\\escape', 'dir/../escape', 'dir/./escape', 'file:stream']) {
+for (const name of ['../escape', '/absolute', 'C:/escape', 'dir\\escape', 'dir/../escape', 'dir/./escape', 'file:stream', 'dir/bad*name']) {
   test(`rejects unsafe archive path ${JSON.stringify(name)}`, async (t) => {
     const f = await fixture(t, [{ name, content: 'unsafe' }]);
     await assert.rejects(extractArchive(f.archive, f.destination), /path|filename|absolute|traversal|backslash/i);

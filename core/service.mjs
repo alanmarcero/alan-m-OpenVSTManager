@@ -36,21 +36,26 @@ export class ManagerService {
   }
   async init(){
     if(this.settings)return;
-    const saved=await readJSON(path.join(this.dataDir,'settings.json'),{});
-    this.validateSettings(saved);
-    this.installer.setPaths(saved.paths || {});
-    const defaultBackup=path.join(this.dataDir,'backups');
-    if(this.installer.setBackupFolder) this.installer.setBackupFolder(saved.backupFolder || defaultBackup);
-    if(this.client.setToken) this.client.setToken(saved.githubToken);
-    this.settings={
-      includePrereleases:saved.includePrereleases ?? false,
-      autoCheckAppUpdates:saved.autoCheckAppUpdates ?? true,
-      paths:{...this.installer.paths},
-      backupFolder:saved.backupFolder || defaultBackup,
-      preferredFormats:Array.isArray(saved.preferredFormats) ? saved.preferredFormats : (this.platform==='darwin'?['VST3','AU']:['VST3']),
-      githubToken:saved.githubToken || '',
-    };
-    await this.cleanupTempDownloads().catch(()=>{});
+    if(this.initializing)return this.initializing;
+    this.initializing=(async()=>{
+      const saved=await readJSON(path.join(this.dataDir,'settings.json'),{});
+      this.validateSettings(saved);
+      this.installer.setPaths(saved.paths || {});
+      const defaultBackup=path.join(this.dataDir,'backups');
+      const resolvedBackup=typeof saved.backupFolder==='string'&&saved.backupFolder.trim()?saved.backupFolder.trim():defaultBackup;
+      if(this.installer.setBackupFolder) this.installer.setBackupFolder(resolvedBackup);
+      if(this.client.setToken) this.client.setToken(saved.githubToken);
+      this.settings={
+        includePrereleases:saved.includePrereleases ?? false,
+        autoCheckAppUpdates:saved.autoCheckAppUpdates ?? true,
+        paths:{...this.installer.paths},
+        backupFolder:resolvedBackup,
+        preferredFormats:Array.isArray(saved.preferredFormats) ? saved.preferredFormats : (this.platform==='darwin'?['VST3','AU']:['VST3']),
+        githubToken:saved.githubToken || '',
+      };
+      await this.cleanupTempDownloads().catch(()=>{});
+    })();
+    try{return await this.initializing;}finally{this.initializing=null;}
   }
   async getState(){
     await this.init();
@@ -178,7 +183,7 @@ export class ManagerService {
     if(!patch || typeof patch!=='object' || Array.isArray(patch))throw new Error('Invalid settings.');
     if(patch.includePrereleases!==undefined && typeof patch.includePrereleases!=='boolean')throw new Error('Prerelease setting must be boolean.');
     if(patch.autoCheckAppUpdates!==undefined && typeof patch.autoCheckAppUpdates!=='boolean')throw new Error('Auto check app updates setting must be boolean.');
-    if(patch.backupFolder!==undefined && (typeof patch.backupFolder!=='string'||!path.isAbsolute(patch.backupFolder)||patch.backupFolder.includes('\0')))throw new Error('Choose an absolute backup folder.');
+    if(patch.backupFolder!==undefined && (typeof patch.backupFolder!=='string'||patch.backupFolder.includes('\0')||(patch.backupFolder.trim() && !path.isAbsolute(patch.backupFolder.trim()))))throw new Error('Choose an absolute backup folder.');
     if(patch.githubToken!==undefined && typeof patch.githubToken!=='string')throw new Error('GitHub token must be a string.');
     if(patch.preferredFormats!==undefined){
       if(!Array.isArray(patch.preferredFormats) || patch.preferredFormats.some(f=>!['VST3','AU'].includes(f)))throw new Error('Invalid preferred formats.');
@@ -193,11 +198,13 @@ export class ManagerService {
   async saveSettings(patch){
     if(this.busy)throw new Error('Wait for the current installation to finish before changing folders.');
     await this.init();this.validateSettings(patch);
+    const defaultBackup=path.join(this.dataDir,'backups');
+    const nextBackupFolder=patch.backupFolder!==undefined?(patch.backupFolder.trim()||defaultBackup):this.settings.backupFolder;
     const next={
       includePrereleases:patch.includePrereleases ?? this.settings.includePrereleases,
       autoCheckAppUpdates:patch.autoCheckAppUpdates ?? this.settings.autoCheckAppUpdates,
       paths:{...this.settings.paths,...patch.paths},
-      backupFolder:patch.backupFolder ?? this.settings.backupFolder,
+      backupFolder:nextBackupFolder,
       preferredFormats:patch.preferredFormats ?? this.settings.preferredFormats,
       githubToken:patch.githubToken ?? this.settings.githubToken,
     };
@@ -382,9 +389,12 @@ export class ManagerService {
         const release = releases.find(r => r.assets.some(a => a.compatible));
         if (!release) continue;
         const supported = Object.keys(plugin.bundleNames).filter(f => f === 'VST3' || this.platform === 'darwin');
+        const preferred = Array.isArray(this.settings.preferredFormats)
+          ? this.settings.preferredFormats.filter(f => supported.includes(f))
+          : [];
         const formats = installed.length > 0
           ? [...new Set(installed.map(i => i.format))]
-          : (supported.includes('VST3') ? ['VST3'] : supported.slice(0, 1));
+          : (preferred.length > 0 ? preferred : (supported.includes('VST3') ? ['VST3'] : supported.slice(0, 1)));
         if (!formats.length) continue;
         candidates.push({ plugin, installed, release, formats });
       }

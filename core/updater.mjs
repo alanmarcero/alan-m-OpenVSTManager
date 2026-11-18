@@ -110,7 +110,7 @@ async function fetchWithRedirects(url, { maxRedirects = 6, fetchImpl = fetch, ti
     if (target.protocol !== 'https:' || target.port || target.username || target.password || !CDN_HOSTS.has(target.hostname)) {
       throw new Error('Refused an unsafe download redirect.');
     }
-    await response.body?.cancel();
+    await response.body?.cancel?.().catch(() => {});
     currentUrl = target.href;
   }
   if (!response?.ok || !response.body) {
@@ -140,11 +140,16 @@ export async function downloadAppUpdate({
 
   // Download main update asset
   const response = await fetchWithRedirects(asset.url, { fetchImpl, timeoutMs: 5 * 60 * 1000, appVersion });
-  const length = Number(response.headers.get('content-length')) || asset.size || 0;
-  if (length > maxBytes) {
-    await response.body.cancel();
+  const headerLength = Number(response.headers.get('content-length'));
+  if (Number.isFinite(headerLength) && headerLength > maxBytes) {
+    await response.body.cancel().catch(() => {});
     throw new Error('Download exceeds size limit.');
   }
+  if (asset.size > 0 && Number.isFinite(headerLength) && headerLength > 0 && headerLength !== asset.size) {
+    await response.body.cancel().catch(() => {});
+    throw new Error('Download size does not match release metadata. Try again.');
+  }
+  const length = (Number.isFinite(headerLength) && headerLength > 0 ? headerLength : 0) || asset.size || 0;
 
   const file = await open(destination, 'wx', 0o755);
   let bytes = 0;
@@ -160,13 +165,13 @@ export async function downloadAppUpdate({
     }
     onProgress(100);
   } catch (error) {
-    await file.close();
-    await rm(destination, { force: true });
+    await file.close().catch(() => {});
+    await rm(destination, { force: true }).catch(() => {});
     throw error;
   }
   await file.close();
 
-  // Verify sha256 checksum if available
+  // Verify sha256 checksum if published
   if (checksumAsset?.url) {
     try {
       const shaResponse = await fetchWithRedirects(checksumAsset.url, { fetchImpl, timeoutMs: 30_000, appVersion });
@@ -179,29 +184,32 @@ export async function downloadAppUpdate({
       }
       const shaText = Buffer.concat(chunks).toString('utf8');
       let expectedHash = null;
-      for (const line of shaText.split('\n')) {
-        const trimmed = line.trim();
-        if (!trimmed) continue;
+      const nonEmptyLines = shaText.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+      for (const trimmed of nonEmptyLines) {
         const match = trimmed.match(/^([a-f0-9]{64})\s+[*]?(.+)$/i);
-        if (match && match[2].trim() === asset.name) {
+        if (match && path.posix.basename(match[2].trim().replace(/\\/g, '/')) === asset.name) {
           expectedHash = match[1].toLowerCase();
           break;
         }
       }
-      if (expectedHash) {
-        const hash = createHash('sha256');
-        for await (const chunk of createReadStream(destination)) {
-          hash.update(chunk);
-        }
-        const actualHash = hash.digest('hex').toLowerCase();
-        if (actualHash !== expectedHash) {
-          await rm(destination, { force: true });
-          throw new Error(`Checksum mismatch for ${asset.name}. Expected ${expectedHash}, got ${actualHash}.`);
-        }
+      if (!expectedHash && nonEmptyLines.length === 1 && /^[a-f0-9]{64}$/i.test(nonEmptyLines[0])) {
+        expectedHash = nonEmptyLines[0].toLowerCase();
+      }
+      if (!expectedHash) {
+        throw new Error(`Checksum manifest does not include ${asset.name}.`);
+      }
+      const hash = createHash('sha256');
+      for await (const chunk of createReadStream(destination)) {
+        hash.update(chunk);
+      }
+      const actualHash = hash.digest('hex').toLowerCase();
+      if (actualHash !== expectedHash) {
+        throw new Error(`Checksum mismatch for ${asset.name}. Expected ${expectedHash}, got ${actualHash}.`);
       }
     } catch (error) {
+      await rm(destination, { force: true }).catch(() => {});
       if (error.message.includes('Checksum mismatch')) throw error;
-      // If checksum file cannot be fetched, don't abort an otherwise valid download unless mismatch
+      throw new Error(`Checksum verification failed for ${asset.name}: ${error.message}`, { cause: error });
     }
   }
 

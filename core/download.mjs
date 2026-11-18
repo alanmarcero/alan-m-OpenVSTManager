@@ -14,12 +14,16 @@ export async function downloadAsset({asset,repo,destination,appVersion='1.4.0',o
     if(!location)throw new Error('Download redirect is missing a target location.');
     const target=new URL(location,url);
     if(target.protocol!=='https:' || target.port || target.username || target.password || !CDN_HOSTS.has(target.hostname))throw new Error('Refused an unsafe download redirect.');
-    await response.body?.cancel();
+    await response.body?.cancel?.().catch(()=>{});
     url=target.href;
   }
   if(!response?.ok || !response.body)throw new Error(`Download failed (${response?.status ?? 'no response'}). Try again.`);
   const length=Number(response.headers.get('content-length'));
-  if(length>maxBytes) {await response.body.cancel();throw new Error('Download exceeds the size limit.');}
+  if(Number.isFinite(length) && length>maxBytes) {await response.body.cancel().catch(()=>{});throw new Error('Download exceeds the size limit.');}
+  if(asset.size>0 && Number.isFinite(length) && length>0 && length!==asset.size){
+    await response.body.cancel().catch(()=>{});
+    throw new Error('Download size does not match release metadata. Try again.');
+  }
   const file=await open(destination,'wx',0o600);
   let bytes=0;
   try{
@@ -31,6 +35,6 @@ export async function downloadAsset({asset,repo,destination,appVersion='1.4.0',o
     }
     if(!bytes || (asset.size>0 && bytes!==asset.size))throw new Error('Download is incomplete. Try again.');
     onProgress(100);
-  }catch(error){await file.close();await rm(destination,{force:true});throw error;}
+  }catch(error){await file.close().catch(()=>{});await rm(destination,{force:true}).catch(()=>{});throw error;}
   await file.close();
 }

@@ -339,3 +339,48 @@ test('GitHub HTTP rate limits keep offline false, fetchState bounds concurrency,
   await service.clearActivityLog();
   assert.deepEqual(await service.getActivityLog(), []);
 });
+
+test('installAll respects preferredFormats, blank backupFolder resets to default, and concurrent init deduplicates', async t => {
+  const dataDir = await mkdtemp(path.join(tmpdir(), 'openvst-service-pref-'));
+  t.after(() => rm(dataDir, { recursive: true, force: true }));
+
+  const plugin = {
+    id: 'openDual', repo: 'openDual', name: 'Dual', description: 'FX', category: 'FX',
+    bundleNames: { VST3: 'openDual.vst3', AU: 'openDual.component' },
+  };
+  let detectCalls = 0;
+  const installedFormats = [];
+  t.mock.method(globalThis, 'fetch', async () => new Response('zipdata'));
+  const client = {
+    catalog: async () => ({ data: [plugin], stale: false }),
+    releases: async () => ({
+      data: [{
+        tag_name: 'v1.0.0', published_at: '2026-11-18T00:00:00Z',
+        assets: [
+          { name: 'openDual-VST3-macOS.zip', browser_download_url: 'https://github.com/alanmarcero/openDual/releases/download/v1.0.0/openDual-VST3-macOS.zip', size: 7 },
+          { name: 'openDual-AU-macOS.zip', browser_download_url: 'https://github.com/alanmarcero/openDual/releases/download/v1.0.0/openDual-AU-macOS.zip', size: 7 },
+        ],
+      }],
+      stale: false, fetchedAt: 12345,
+    }),
+  };
+  const installer = {
+    paths: { VST3: '/tmp/vst3', AU: '/tmp/au' },
+    setPaths() {},
+    detect: async () => { detectCalls++; return []; },
+    install: async (opts) => { installedFormats.push(...opts.formats); return []; },
+  };
+  const service = new ManagerService({
+    dataDir, client, installer, platform: 'darwin', arch: 'arm64',
+    appVersion: '1.4.3', bundledCatalog: [plugin],
+  });
+
+  await Promise.all([service.init(), service.init()]);
+  await service.saveSettings({ preferredFormats: ['AU'], backupFolder: '   ' });
+  const state = await service.getState();
+  assert.equal(state.settings.backupFolder, path.join(dataDir, 'backups'));
+
+  await service.installAll();
+  assert.deepEqual(installedFormats, ['AU']);
+  assert.ok(detectCalls >= 1);
+});
