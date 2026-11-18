@@ -240,3 +240,33 @@ test('applyAppUpdate opens dmg on macOS and returns false on Linux', () => {
   assert.equal(spawned.unrefed, true);
   assert.equal(applyAppUpdate({ installerPath: '/tmp/app.AppImage', platform: 'linux', spawnImpl: mockSpawn }), false);
 });
+
+test('downloadAppUpdate verifies ./ prefixed manifests and refuses silent checksum bypass when manifest fails', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'updater-sha-'));
+  try {
+    const payload = Buffer.from('verified-installer-payload');
+    const expectedHash = createHash('sha256').update(payload).digest('hex');
+
+    const downloaded = await downloadAppUpdate({
+      asset: { name: 'OpenVSTManager-1.4.3-win-x64.exe', url: 'https://github.com/app.exe', size: payload.length },
+      checksumAsset: { name: 'SHA256SUMS.txt', url: 'https://github.com/SHA256SUMS.txt' },
+      tempDir: dir,
+      fetchImpl: async (url) => url.includes('SHA256SUMS')
+        ? new Response(`${expectedHash}  ./OpenVSTManager-1.4.3-win-x64.exe\n`, { status: 200 })
+        : new Response(payload, { status: 200, headers: { 'content-length': String(payload.length) } }),
+    });
+    assert.deepEqual(await readFile(downloaded), payload);
+    await rm(downloaded, { force: true });
+
+    await assert.rejects(() => downloadAppUpdate({
+      asset: { name: 'OpenVSTManager-1.4.3-win-x64.exe', url: 'https://github.com/app.exe', size: payload.length },
+      checksumAsset: { name: 'SHA256SUMS.txt', url: 'https://github.com/SHA256SUMS.txt' },
+      tempDir: dir,
+      fetchImpl: async (url) => url.includes('SHA256SUMS')
+        ? new Response('not found', { status: 404 })
+        : new Response(payload, { status: 200, headers: { 'content-length': String(payload.length) } }),
+    }), /Checksum verification failed/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

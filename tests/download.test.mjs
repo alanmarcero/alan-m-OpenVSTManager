@@ -18,4 +18,6 @@ test('refuses foreign redirects and incomplete or oversized downloads without le
  await assert.rejects(()=>downloadAsset({asset:{url,size:10},repo:'openMaster',destination,fetchImpl:async()=>new Response('hello')}),/incomplete/i);
  await assert.rejects(()=>access(destination));
  await assert.rejects(()=>downloadAsset({asset:{url,size:5},repo:'openMaster',destination,maxBytes:4,fetchImpl:async()=>new Response('hello')}),/size limit/i);
+ await assert.rejects(()=>downloadAsset({asset:{url,size:5},repo:'openMaster',destination,fetchImpl:async()=>new Response('helloo',{headers:{'content-length':'6'}})}),/does not match/i);
+ await assert.rejects(()=>access(destination));
 });

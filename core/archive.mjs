@@ -9,7 +9,7 @@ import yauzl from 'yauzl';
 const DEFAULT_LIMITS = { maxEntries: 20_000, maxTotalBytes: 2 * 1024 ** 3, maxFileBytes: 1024 ** 3 };
 
 function entryPath(name) {
-  if (!name || /[\\\x00-\x1f:]/.test(name) || name.startsWith('/')) {
+  if (!name || /[\\\x00-\x1f:<>"|?*]/.test(name) || name.startsWith('/')) {
     throw new Error(`Unsafe archive path: ${JSON.stringify(name)}`);
   }
   const segments = name.replace(/\/$/, '').split('/');
