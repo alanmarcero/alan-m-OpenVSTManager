@@ -20,7 +20,8 @@
     "cli": "node scripts/cli.mjs",
     "test:desktop": "npm run build && node scripts/smoke.mjs",
     "test:ui": "playwright test",
-    "test:package": "node scripts/package-smoke.mjs"
+    "test:package": "node scripts/package-smoke.mjs",
+    "check:screenshots": "node scripts/check-screenshots.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.61.0",
