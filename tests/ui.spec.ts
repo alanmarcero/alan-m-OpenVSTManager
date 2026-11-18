@@ -61,6 +61,7 @@ const test = base.extend({
       window.manager = {
         getState: async () => snapshot(), refresh: async () => snapshot(),
         onProgress: () => () => {}, openExternal: async () => {},
+        openFolder: async () => {},
         chooseDirectory: async () => '/tmp/openvst-test/chosen',
         saveSettings: async patch => {
           fixture.state.settings = { ...fixture.state.settings, ...patch, paths: { ...fixture.state.settings.paths, ...patch.paths } };
@@ -249,6 +250,7 @@ test('shows latest release notes when updates exist, renders auto-updating scree
   await expect(modal).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Updates', exact: true }).click();
+  await expect(page.locator('.plugin-row .plugin-version')).toContainText('0.9.0 → 1.0.0');
   await expect(page.locator('.plugin-row .plugin-update-summary')).toContainText('Adds analog drive curves and LFO sync refinements.');
   const toggle = page.getByRole('button', { name: 'Show full notes' });
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
@@ -257,7 +259,61 @@ test('shows latest release notes when updates exist, renders auto-updating scree
   const fullNotes = page.getByRole('region', { name: /Full release notes for openEDMFilter/ });
   await expect(fullNotes).toContainText('Improved filter envelope tracking.');
   await expectSeparatedControls(page);
+  await page.getByRole('button', { name: 'Collapse all notes', exact: true }).click();
+  await expect(fullNotes).toHaveCount(0);
+  await page.getByRole('button', { name: 'Expand all notes', exact: true }).click();
+  await expect(fullNotes).toContainText('Improved filter envelope tracking.');
   await page.getByRole('button', { name: 'Hide full notes' }).click();
   await expect(fullNotes).toHaveCount(0);
+  await expectSeparatedControls(page);
+});
+
+test('supports sorting, alias search, keyboard focus, detail release notes, formatted update modal, and path validation', async ({ page }) => {
+  const sortSelect = page.getByRole('combobox', { name: 'Sort' });
+  await sortSelect.selectOption('name');
+  const names = await page.locator('.plugin-row .plugin-name').allTextContents();
+  expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
+
+  await page.keyboard.press('/');
+  const search = page.getByRole('textbox', { name: 'Search plugins' });
+  await expect(search).toBeFocused();
+  await search.fill('openMaster');
+  await expect(page.locator('.plugin-row')).toHaveCount(1);
+  await expect(page.locator('.plugin-row .plugin-name')).toHaveText('openBassSpace');
+  await search.press('Escape');
+  await expect(search).toHaveValue('');
+
+  await page.evaluate(() => {
+    const bass = window.__managerTest.state.plugins.find(p => p.id === 'openBassSpace')!;
+    bass.releases[0].notes = '### Changes\n\n- Added *stereo* width mode. See [guide](https://example.com).';
+    window.__managerTest.state.appUpdate = {
+      available: true,
+      currentVersion: '1.3.1',
+      latestVersion: '1.4.0',
+      notes: '## Highlights\n\n- **Faster** refresh with [details](https://example.com).',
+      url: 'https://github.com/alanmarcero/alan-m-OpenVSTManager/releases/tag/v1.4.0',
+    };
+  });
+  await page.getByRole('button', { name: 'Check for updates', exact: true }).click();
+  await page.getByRole('button', { name: /openBassSpace Mastering/ }).click();
+  const detailToggle = page.getByRole('button', { name: 'Release notes for v1.0.0' });
+  await detailToggle.click();
+  const detailNotes = page.getByRole('region', { name: 'Release notes for version 1.0.0' });
+  await expect(detailNotes).toContainText('Added stereo width mode. See guide.');
+  await expect(detailNotes).not.toContainText('https://example.com');
+
+  await page.getByRole('button', { name: 'Update to v1.4.0' }).click();
+  const updateDialog = page.getByRole('dialog', { name: 'Update OpenVST Manager' });
+  await expect(updateDialog).toBeVisible();
+  await expect(updateDialog).toContainText('Faster refresh with details.');
+  await expect(updateDialog).not.toContainText('https://example.com');
+  await expectSeparatedControls(page);
+  await page.keyboard.press('Escape');
+  await expect(updateDialog).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.locator('#path-VST3').fill('relative/path');
+  await expect(page.getByText('Enter an absolute folder path.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save changes', exact: true })).toBeDisabled();
   await expectSeparatedControls(page);
 });

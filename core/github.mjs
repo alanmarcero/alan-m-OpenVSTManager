@@ -48,7 +48,7 @@ function formatHttpError(response) {
 }
 
 export class GitHubClient {
-  constructor({cacheDir,fetchImpl=fetch,token=null,appVersion='1.1.0'}={}) {
+  constructor({cacheDir,fetchImpl=fetch,token=null,appVersion='1.4.0'}={}) {
     this.cacheDir=cacheDir;
     this.fetch=fetchImpl;
     this.token=token ? String(token).trim() : null;

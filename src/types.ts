@@ -33,6 +33,7 @@ export interface Plugin {
   category: string;
   repo: string;
   url: string;
+  aliases?: string[];
   bundleNames: { VST3: string | string[]; AU?: string | string[] };
   formats: PluginFormat[];
   installed: InstalledPlugin[];
@@ -112,6 +113,7 @@ export interface ManagerAPI {
   checkAppUpdate?(): Promise<AppUpdateInfo>;
   installAppUpdate?(): Promise<{ success: boolean; installerPath?: string }>;
   openExternal(url: string): Promise<void>;
+  openFolder?(folder: string): Promise<void>;
   onProgress(callback: (progress: Progress) => void): () => void;
 }
 

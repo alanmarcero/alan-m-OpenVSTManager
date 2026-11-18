@@ -208,3 +208,22 @@ test('applyAppUpdate spawns detached installer on Windows', () => {
   assert.equal(spawned.opts.detached, true);
   assert.equal(spawned.unrefed, true);
 });
+
+test('downloadAppUpdate rejects untrusted URLs and unsafe asset filenames', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'updater-sec-'));
+  try {
+    await assert.rejects(() => downloadAppUpdate({
+      asset: { name: 'OpenVSTManager.exe', url: 'https://evil.example/app.exe', size: 10 },
+      tempDir: dir,
+      fetchImpl: async () => { throw new Error('should not fetch'); },
+    }), /untrusted/i);
+
+    await assert.rejects(() => downloadAppUpdate({
+      asset: { name: '../escape.exe', url: 'https://github.com/app.exe', size: 10 },
+      tempDir: dir,
+      fetchImpl: async () => { throw new Error('should not fetch'); },
+    }), /Invalid update asset filename/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
