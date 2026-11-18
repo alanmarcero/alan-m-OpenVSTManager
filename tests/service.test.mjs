@@ -276,3 +276,66 @@ test('uninstallAll reports partial failures, saveSettings refreshes on token cha
   await service.clearCache();
   assert.equal(releaseCalls, 3);
 });
+
+test('GitHub HTTP rate limits keep offline false, fetchState bounds concurrency, log rotation keeps history, and enabling autoCheck triggers checkAppUpdate', async t => {
+  const dataDir = await mkdtemp(path.join(tmpdir(), 'openvst-service-v142-'));
+  t.after(() => rm(dataDir, { recursive: true, force: true }));
+
+  const plugins = Array.from({ length: 12 }, (_, i) => ({
+    id: `openP${i}`, repo: `openP${i}`, name: `Plugin ${i}`,
+    description: 'FX', category: 'FX', bundleNames: { VST3: `openP${i}.vst3` },
+  }));
+
+  let inFlight = 0;
+  let maxInFlight = 0;
+  let rateLimited = false;
+  let appChecks = 0;
+  const client = {
+    catalog: async () => ({ data: plugins, stale: false }),
+    releases: async () => {
+      inFlight++;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await new Promise(resolve => setTimeout(resolve, 15));
+      inFlight--;
+      if (rateLimited) {
+        return { data: [], stale: true, httpStatus: 403, error: 'GitHub rate limit reached. Try again later. Add a GitHub Token in Settings to raise the hourly limit.' };
+      }
+      return { data: [], stale: false, fetchedAt: 12345 };
+    },
+    appReleases: async () => {
+      appChecks++;
+      return { data: [], stale: false, fetchedAt: 12345 };
+    },
+  };
+  const installer = { paths: { VST3: '/tmp/plugins' }, setPaths() {}, detect: async () => [] };
+  const service = new ManagerService({
+    dataDir, client, installer, platform: 'win32', arch: 'x64',
+    appVersion: '1.4.2', bundledCatalog: plugins,
+  });
+
+  const initial = await service.getState();
+  assert.equal(initial.offline, false);
+  assert.ok(maxInFlight <= 6, `expected <= 6 concurrent release fetches, got ${maxInFlight}`);
+
+  rateLimited = true;
+  const limitedState = await service.refresh();
+  assert.equal(limitedState.offline, false);
+  assert.match(limitedState.error || '', /GitHub rate limit reached/i);
+
+  await service.saveSettings({ autoCheckAppUpdates: false });
+  const checksBeforeEnable = appChecks;
+  await service.saveSettings({ autoCheckAppUpdates: true });
+  assert.equal(appChecks, checksBeforeEnable + 1);
+
+  const padding = 'x'.repeat(200);
+  const { writeFile } = await import('node:fs/promises');
+  const lines = Array.from({ length: 1200 }, (_, i) => `2026-11-18T00:00:00.000Z entry-${i} ${padding}\n`).join('');
+  await writeFile(path.join(dataDir, 'activity.log'), lines, 'utf8');
+  await service.log('final-entry');
+  const log = await service.getActivityLog(500);
+  assert.equal(log[0].includes('final-entry'), true);
+  assert.ok(log.some(line => line.includes('entry-1199')), 'expected recent entries preserved on log rotation');
+
+  await service.clearActivityLog();
+  assert.deepEqual(await service.getActivityLog(), []);
+});

@@ -28,6 +28,11 @@ function detectImageContentType(buffer) {
 }
 
 async function readResponseBytes(response, maxBytes, overflowMessage) {
+  const declared = Number(response.headers?.get?.('content-length'));
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    await response.body?.cancel?.().catch(() => {});
+    throw new Error(overflowMessage);
+  }
   if (!response.body) return Buffer.alloc(0);
   const chunks = [];
   let bytes = 0;
@@ -39,18 +44,29 @@ async function readResponseBytes(response, maxBytes, overflowMessage) {
   return Buffer.concat(chunks);
 }
 
-function formatHttpError(response) {
+function formatHttpError(response, { hasToken = false } = {}) {
+  let err;
   if (response.status === 401) {
-    return new Error('GitHub rejected your token (401). Check or clear your GitHub Token in Settings.');
+    err = new Error('GitHub rejected your token (401). Check or clear your GitHub Token in Settings.');
+  } else {
+    const remaining = response.headers?.get?.('x-ratelimit-remaining');
+    const resetRaw = response.headers?.get?.('x-ratelimit-reset');
+    const reset = resetRaw ? Number(resetRaw) : 0;
+    const isRateLimit = response.status === 429 ||
+      (response.status === 403 && (remaining === '0' || (Number.isFinite(reset) && reset > 0)));
+    if (isRateLimit) {
+      const hint = hasToken ? '' : ' Add a GitHub Token in Settings to raise the hourly limit.';
+      err = new Error(`GitHub rate limit reached. Try again ${reset ? 'after ' + new Date(reset * 1000).toLocaleTimeString() : 'in a few minutes'}.${hint}`);
+    } else if (response.status === 403) {
+      err = new Error('GitHub denied access (403). Check your token permissions or try again later.');
+    } else if (response.status === 404) {
+      err = new Error('Plugin resource not found on GitHub (404).');
+    } else {
+      err = new Error(`GitHub returned ${response.status}. Try refreshing again.`);
+    }
   }
-  if (response.status === 403 || response.status === 429) {
-    const reset = Number(response.headers.get('x-ratelimit-reset'));
-    return new Error(`GitHub rate limit reached. Try again ${reset ? 'after ' + new Date(reset * 1000).toLocaleTimeString() : 'in a few minutes'}.`);
-  }
-  if (response.status === 404) {
-    return new Error('Plugin resource not found on GitHub (404).');
-  }
-  return new Error(`GitHub returned ${response.status}. Try refreshing again.`);
+  err.httpStatus = response.status;
+  return err;
 }
 
 export class GitHubClient {
@@ -79,7 +95,7 @@ export class GitHubClient {
       let data;
       if(response.status===304 && cached) data=cached.data;
       else {
-        if(!response.ok) throw formatHttpError(response);
+        if(!response.ok) throw formatHttpError(response, { hasToken: Boolean(this.token) });
         const bytes=await readResponseBytes(response,MAX_JSON,'GitHub response exceeds the metadata size limit.');
         data=JSON.parse(bytes.toString('utf8'));
       }
@@ -88,7 +104,7 @@ export class GitHubClient {
       await writeJSON(file,result);
       return {...result,stale:false};
     }catch(error){
-      if(cached){validate(cached.data);return {...cached,stale:true,error:error.message};}
+      if(cached){validate(cached.data);return {...cached,stale:true,error:error.message,...(Number.isInteger(error?.httpStatus)?{httpStatus:error.httpStatus}:{})};}
       throw error;
     }
   }
@@ -117,7 +133,7 @@ export class GitHubClient {
         contentType=cachedMeta.contentType;
         version=cachedMeta.version;
       } else {
-        if(!response.ok) throw formatHttpError(response);
+        if(!response.ok) throw formatHttpError(response, { hasToken: Boolean(this.token) });
         data=await readResponseBytes(response,MAX_IMAGE,'GitHub screenshot exceeds the size limit.');
         contentType=detectImageContentType(data);
         version=createHash('sha256').update(data).digest('hex').slice(0,12);
@@ -128,7 +144,7 @@ export class GitHubClient {
       await writeJSON(metaFile,meta);
       return {contentType,version,fetchedAt,stale:false,...(includeData?{data}:{})};
     } catch(error) {
-      if(cachedValid) return {contentType:cachedMeta.contentType,version:cachedMeta.version,fetchedAt:cachedMeta.fetchedAt,stale:true,error:error.message,...(includeData?{data:cachedBuffer}:{})};
+      if(cachedValid) return {contentType:cachedMeta.contentType,version:cachedMeta.version,fetchedAt:cachedMeta.fetchedAt,stale:true,error:error.message,...(Number.isInteger(error?.httpStatus)?{httpStatus:error.httpStatus}:{}),...(includeData?{data:cachedBuffer}:{})};
       throw error;
     }
   }

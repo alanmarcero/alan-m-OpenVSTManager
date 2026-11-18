@@ -86,3 +86,28 @@ test('401 unauthorized surfaces an actionable GitHub token error',async t=>{
   client.setToken('bad_token');
   await assert.rejects(()=>client.releases('openMaster'),/token.*401|rejected your token/i);
 });
+test('Content-Length pre-check rejects oversized responses before reading body and 403 distinguishes access denied from rate limit',async t=>{
+  let bodyRead=false;
+  const oversized=await setup(t,async()=>({
+    ok:true,
+    status:200,
+    headers:new Headers({'content-length':String(9*1024*1024)}),
+    body:{
+      async cancel(){},
+      async *[Symbol.asyncIterator](){bodyRead=true;yield Buffer.from('[]');}
+    }
+  }));
+  await assert.rejects(()=>oversized.releases('openMaster'),/exceeds the metadata size limit/);
+  assert.equal(bodyRead,false);
+
+  const forbidden=await setup(t,async()=>new Response('{}',{status:403}));
+  await assert.rejects(()=>forbidden.releases('openMaster'),err=>{
+    assert.equal(err.httpStatus,403);
+    assert.match(err.message,/denied access \(403\)/i);
+    assert.doesNotMatch(err.message,/rate limit/i);
+    return true;
+  });
+
+  const limitedAnon=await setup(t,async()=>new Response('{}',{status:403,headers:{'x-ratelimit-remaining':'0'}}));
+  await assert.rejects(()=>limitedAnon.releases('openMaster'),/GitHub Token in Settings/i);
+});

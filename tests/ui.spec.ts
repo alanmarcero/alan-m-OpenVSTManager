@@ -57,13 +57,19 @@ const test = base.extend({
     await page.addInitScript(state => {
       const fixture: Window['__managerTest'] = { state, calls: [], failInstall: false };
       window.__managerTest = fixture;
+      let logLines = ['2026-11-18T16:00:00Z openEDMFilter: complete'];
+      Object.defineProperty(navigator, 'clipboard', {
+        value: { writeText: async (text: string) => { (window as unknown as { __copied?: string }).__copied = text; } },
+        configurable: true,
+      });
       const snapshot = () => structuredClone(fixture.state);
       window.manager = {
         getState: async () => snapshot(), refresh: async () => snapshot(),
         onProgress: () => () => {}, openExternal: async () => {},
         openFolder: async () => {},
         openDataFolder: async () => {},
-        getActivityLog: async () => ['2026-11-18T16:00:00Z openEDMFilter: complete'],
+        getActivityLog: async () => [...logLines],
+        clearActivityLog: async () => { logLines = []; return []; },
         clearCache: async () => snapshot(),
         chooseDirectory: async () => '/tmp/openvst-test/chosen',
         saveSettings: async patch => {
@@ -288,7 +294,9 @@ test('supports sorting, alias search, keyboard focus, detail release notes, form
 
   await page.evaluate(() => {
     const bass = window.__managerTest.state.plugins.find(p => p.id === 'openBassSpace')!;
-    bass.releases[0].notes = '### Changes\n\n- Added *stereo* width mode. See [guide](https://example.com).';
+    bass.releases[0].notes = '### Changes\n\n---\n\n1. Added *stereo* width mode. See [guide](https://example.com).\n2. Tightened low-end mono.';
+    window.__managerTest.state.error = 'GitHub rate limit reached. Try again later.';
+    window.__managerTest.state.offline = false;
     window.__managerTest.state.appUpdate = {
       available: true,
       currentVersion: '1.3.1',
@@ -298,12 +306,25 @@ test('supports sorting, alias search, keyboard focus, detail release notes, form
     };
   });
   await page.getByRole('button', { name: 'Check for updates', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'GitHub rate limit reached.' })).toBeVisible();
+  await expect(page.locator('.last-checked')).not.toContainText('Offline');
+  await expect(page.getByRole('combobox', { name: 'Category' })).toContainText(/Mastering \(\d+\)/);
+
+  await page.getByRole('button', { name: /openEDMFilter Filter/ }).click();
+  await page.getByRole('button', { name: 'Copy openEDMFilter VST3 path' }).click();
+  await expect(page.getByText('Copied path to clipboard.')).toBeVisible();
+  await page.getByRole('button', { name: 'Dismiss notification' }).click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __copied?: string }).__copied)).toBe('/tmp/openvst-test/existing.vst3');
+  await expectSeparatedControls(page);
+
   await page.getByRole('button', { name: /openBassSpace Mastering/ }).click();
   await expect(page.locator('.version-label')).toContainText('1 KB');
   const detailToggle = page.getByRole('button', { name: 'Release notes for v1.0.0' });
   await detailToggle.click();
   const detailNotes = page.getByRole('region', { name: 'Release notes for version 1.0.0' });
+  await expect(detailNotes.locator('ol li')).toHaveCount(2);
   await expect(detailNotes).toContainText('Added stereo width mode. See guide.');
+  await expect(detailNotes).not.toContainText('---');
   await expect(detailNotes).not.toContainText('https://example.com');
 
   await page.getByRole('button', { name: 'Update to v1.4.0' }).click();
@@ -323,5 +344,8 @@ test('supports sorting, alias search, keyboard focus, detail release notes, form
   await expect(page.locator('#path-VST3')).toHaveValue('/tmp/openvst-test/VST3');
   await page.getByRole('button', { name: 'Show recent activity' }).click();
   await expect(page.getByText(/openEDMFilter: complete/)).toBeVisible();
+  await expectSeparatedControls(page);
+  await page.getByRole('button', { name: 'Clear log' }).click();
+  await expect(page.getByText('No activity recorded yet.')).toBeVisible();
   await expectSeparatedControls(page);
 });
