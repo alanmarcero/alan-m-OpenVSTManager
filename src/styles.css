@@ -151,6 +151,18 @@ svg { flex-shrink: 0; }
 .release-notes-body li { margin: 2px 0; overflow-wrap: anywhere; }
 .release-notes-body code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 10px; padding: 1px 4px; border-radius: 3px; background: rgba(45, 70, 82, 0.12); }
 .release-notes-empty { font-size: 11px; color: #6e808a; margin: 0; }
+.plugin-row-notes { padding: 6px 13px 10px 66px; border-bottom: 1px solid #e3e8eb; }
+.notes-toggle { display: inline-flex; align-items: center; gap: 4px; padding: 3px 6px; margin-left: -6px; border: 0; border-radius: 5px; background: transparent; color: #366a71; font-size: 11px; font-weight: 600; cursor: pointer; }
+.notes-toggle:hover { background: #e3ecee; }
+.notes-toggle:focus-visible { outline: 2px solid #3f8d98; outline-offset: 1px; }
+.notes-toggle svg { transition: transform 120ms ease; }
+.notes-toggle svg.notes-toggle-open { transform: rotate(180deg); }
+.plugin-row-notes-body { margin-top: 6px; padding: 10px 12px; border-radius: 7px; background: #e3ecee; border: 1px solid #cddce0; }
+:is([data-theme="dark"], [data-theme="cyberpunk"]) .plugin-row-notes { border-bottom-color: var(--line); }
+:is([data-theme="dark"], [data-theme="cyberpunk"]) .notes-toggle { color: #8fd2dc; }
+:is([data-theme="dark"], [data-theme="cyberpunk"]) .notes-toggle:hover { background: var(--theme-panel); }
+:is([data-theme="dark"], [data-theme="cyberpunk"]) .plugin-row-notes-body { background: #172b35; border-color: #294a56; }
+[data-theme="cyberpunk"] .plugin-row-notes-body { background: #16223a; border-color: #3a4a73; }
 .screenshot-dialog { max-width: min(960px, calc(100vw - 48px)); width: auto; overscroll-behavior: contain; }
 .screenshot-dialog-content { padding: 18px 20px 20px; }
 .screenshot-dialog-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
