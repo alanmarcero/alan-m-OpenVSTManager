@@ -30,8 +30,8 @@ export function summarizeReleaseNotes(notes: string): string {
   const parts: string[] = [];
   for (const raw of lines) {
     const trimmed = raw.trim();
-    if (!trimmed || /^#{2,6}\s+/.test(trimmed)) continue;
-    const text = stripInlineMarkdown(trimmed.replace(/^[-*]\s+/, ''));
+    if (!trimmed || /^#{1,6}\s+/.test(trimmed) || /^([-*_])\1{2,}$/.test(trimmed)) continue;
+    const text = stripInlineMarkdown(trimmed.replace(/^(?:[-*]|\d+\.)\s+/, ''));
     if (text) parts.push(text);
     if (parts.join(' ').length >= 160) break;
   }
@@ -79,6 +79,7 @@ export function ReleaseNotesBody({ notes }: { notes: string }) {
 
   const blocks: ReactNode[] = [];
   let bullets: string[] = [];
+  let ordered: string[] = [];
   let paragraph: string[] = [];
   let key = 0;
 
@@ -98,32 +99,61 @@ export function ReleaseNotesBody({ notes }: { notes: string }) {
     );
     bullets = [];
   };
+  const flushOrdered = () => {
+    if (!ordered.length) return;
+    blocks.push(
+      <ol key={key++}>
+        {ordered.map((item, idx) => (
+          <li key={idx}>{renderInline(item)}</li>
+        ))}
+      </ol>
+    );
+    ordered = [];
+  };
 
   for (const raw of lines) {
     const trimmed = raw.trim();
     if (!trimmed) {
       flushParagraph();
       flushBullets();
+      flushOrdered();
+      continue;
+    }
+    if (/^([-*_])\1{2,}$/.test(trimmed)) {
+      flushParagraph();
+      flushBullets();
+      flushOrdered();
       continue;
     }
     const heading = trimmed.match(/^#{1,6}\s+(.*)$/);
     if (heading) {
       flushParagraph();
       flushBullets();
+      flushOrdered();
       blocks.push(<h4 key={key++}>{renderInline(heading[1])}</h4>);
       continue;
     }
     const bullet = trimmed.match(/^[-*]\s+(.*)$/);
     if (bullet) {
       flushParagraph();
+      flushOrdered();
       bullets.push(bullet[1]);
       continue;
     }
+    const numbered = trimmed.match(/^\d+\.\s+(.*)$/);
+    if (numbered) {
+      flushParagraph();
+      flushBullets();
+      ordered.push(numbered[1]);
+      continue;
+    }
     flushBullets();
+    flushOrdered();
     paragraph.push(trimmed);
   }
   flushParagraph();
   flushBullets();
+  flushOrdered();
 
   return <div className="release-notes-body">{blocks}</div>;
 }

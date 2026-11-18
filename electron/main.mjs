@@ -1,4 +1,4 @@
-import {app,BrowserWindow,ipcMain,dialog,shell,session,Menu,protocol,net} from 'electron';
+import {app,BrowserWindow,ipcMain,dialog,shell,session,Menu,protocol,net,screen} from 'electron';
 import {mkdir,readFile,stat} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
@@ -6,10 +6,12 @@ import {Installer} from '../core/installer.mjs';
 import {GitHubClient} from '../core/github.mjs';
 import {findPlugin} from '../core/releases.mjs';
 import {ManagerService} from '../core/service.mjs';
+import {readJSON,writeJSON} from '../core/storage.mjs';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const origin='openvst://app';
 app.setName('OpenVST Manager');
+if(process.platform==='win32')app.setAppUserModelId('com.alanmarcero.openvstmanager');
 protocol.registerSchemesAsPrivileged([{scheme:'openvst',privileges:{standard:true,secure:true,supportFetchAPI:true}}]);
 if(process.env.OPENVST_DATA_DIR)app.setPath('userData',path.resolve(process.env.OPENVST_DATA_DIR));
 if(!app.requestSingleInstanceLock())app.quit();
@@ -66,6 +68,7 @@ else {
       return result;
     },
     getActivityLog:()=>manager.getActivityLog(),
+    clearActivityLog:()=>manager.clearActivityLog(),
     clearCache:()=>manager.clearCache(),
     openDataFolder:async()=>{
       await mkdir(dataDir,{recursive:true});
@@ -118,13 +121,61 @@ else {
     if(!window || event.sender!==window.webContents || event.senderFrame!==window.webContents.mainFrame || !event.senderFrame.url.startsWith(origin+'/'))throw new Error('Untrusted window.');
     return handler(...args);
   });
+  const windowStateFile=path.join(dataDir,'window-state.json');
+  const isVisibleOnAnyDisplay=bounds=>{
+    if(!Number.isFinite(bounds.x)||!Number.isFinite(bounds.y))return false;
+    return screen.getAllDisplays().some(display=>{
+      const area=display.workArea;
+      const overlapX=Math.min(bounds.x+bounds.width,area.x+area.width)-Math.max(bounds.x,area.x);
+      const overlapY=Math.min(bounds.y+bounds.height,area.y+area.height)-Math.max(bounds.y,area.y);
+      return overlapX>=120 && overlapY>=80;
+    });
+  };
+  const savedRaw=await readJSON(windowStateFile,null).catch(()=>null);
+  const initialWidth=savedRaw&&Number.isFinite(savedRaw.width)?Math.max(860,Math.min(3840,Math.round(savedRaw.width))):1220;
+  const initialHeight=savedRaw&&Number.isFinite(savedRaw.height)?Math.max(620,Math.min(2400,Math.round(savedRaw.height))):820;
+  const hasVisiblePos=Boolean(savedRaw&&isVisibleOnAnyDisplay({width:initialWidth,height:initialHeight,x:savedRaw.x,y:savedRaw.y}));
+  let windowState={
+    width:initialWidth,
+    height:initialHeight,
+    ...(hasVisiblePos?{x:Math.round(savedRaw.x),y:Math.round(savedRaw.y)}:{}),
+    isMaximized:Boolean(savedRaw?.isMaximized)
+  };
   function createWindow(){
-    window=new BrowserWindow({width:1220,height:820,minWidth:860,minHeight:620,title:'OpenVST Manager',backgroundColor:'#f4f6f7',show:true,
+    window=new BrowserWindow({width:windowState.width,height:windowState.height,
+      ...(Number.isInteger(windowState.x)&&Number.isInteger(windowState.y)?{x:windowState.x,y:windowState.y}:{}),
+      minWidth:860,minHeight:620,title:'OpenVST Manager',backgroundColor:'#f4f6f7',show:true,
       icon:path.join(root,'assets','icon.png'),
       webPreferences:{preload:path.join(root,'electron','preload.cjs'),nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true}});
+    if(windowState.isMaximized)window.maximize();
+    let saveTimer=null;
+    const captureBounds=()=>{
+      if(!window||window.isDestroyed())return;
+      const maximized=window.isMaximized();
+      if(!maximized&&!window.isMinimized()){
+        const b=window.getBounds();
+        windowState={...b,isMaximized:false};
+      }else{
+        windowState={...windowState,isMaximized:maximized};
+      }
+    };
+    const scheduleSave=()=>{
+      captureBounds();
+      clearTimeout(saveTimer);
+      saveTimer=setTimeout(()=>writeJSON(windowStateFile,windowState).catch(()=>{}),250);
+    };
+    window.on('resize',scheduleSave);
+    window.on('move',scheduleSave);
+    window.on('maximize',scheduleSave);
+    window.on('unmaximize',scheduleSave);
     window.webContents.setWindowOpenHandler(()=>({action:'deny'}));
     window.webContents.on('will-navigate',event=>event.preventDefault());
-    window.on('close',event=>{if(manager.busy){event.preventDefault();dialog.showMessageBox(window,{type:'info',message:'An installation is still running.',detail:'Wait for it to finish before closing OpenVST Manager.'});}});
+    window.on('close',event=>{
+      if(manager.busy){event.preventDefault();dialog.showMessageBox(window,{type:'info',message:'An installation is still running.',detail:'Wait for it to finish before closing OpenVST Manager.'});return;}
+      clearTimeout(saveTimer);
+      captureBounds();
+      writeJSON(windowStateFile,windowState).catch(()=>{});
+    });
     window.loadURL(origin+'/index.html');
   }
   Menu.setApplicationMenu(Menu.buildFromTemplate([

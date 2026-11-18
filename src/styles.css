@@ -150,8 +150,8 @@ svg { flex-shrink: 0; }
 .release-notes-body h4 { font-size: 11px; font-weight: 600; color: #394d58; margin: 8px 0 4px; }
 .release-notes-body h4:first-child { margin-top: 0; }
 .release-notes-body p { margin: 0 0 6px; overflow-wrap: anywhere; }
-.release-notes-body p:last-child, .release-notes-body ul:last-child { margin-bottom: 0; }
-.release-notes-body ul { margin: 4px 0 6px; padding-left: 16px; }
+.release-notes-body p:last-child, .release-notes-body ul:last-child, .release-notes-body ol:last-child { margin-bottom: 0; }
+.release-notes-body ul, .release-notes-body ol { margin: 4px 0 6px; padding-left: 16px; }
 .release-notes-body li { margin: 2px 0; overflow-wrap: anywhere; }
 .release-notes-body code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 10px; padding: 1px 4px; border-radius: 3px; background: rgba(45, 70, 82, 0.12); }
 .release-notes-empty { font-size: 11px; color: #6e808a; margin: 0; }
@@ -210,7 +210,7 @@ svg { flex-shrink: 0; }
 .remove-button:hover:not(:disabled) { color: #a04d4d; background: #eadfdf; }
 .installed-version { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #8a99a1; padding: 11px 0 0; gap: 8px; }
 .installed-version-meta { display: inline-flex; align-items: center; gap: 4px; }
-.inline-folder-button { width: 22px; height: 22px; }
+.inline-folder-button, .inline-copy-button { width: 22px; height: 22px; }
 .detail-links { margin-top: 24px; border-top: 1px solid #dbe2e6; padding-top: 9px; }
 .detail-links button { display: flex; align-items: center; width: 100%; padding: 10px 0; border: 0; background: transparent; font-size: 11px; color: #647982; gap: 9px; }
 .detail-links button > svg:last-child { margin-left: auto; color: #a4afb6; }
@@ -591,6 +591,7 @@ svg { flex-shrink: 0; }
 .update-notes-box h3 { font-size: 12px; font-weight: 600; margin: 0 0 8px; color: var(--ink); }
 .diagnostics-section { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
 .activity-log-wrap { margin-top: 14px; }
+.activity-log-controls { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .activity-log-box { margin-top: 8px; background: #ecf0f2; border: 1px solid #d9e2e6; border-radius: 6px; padding: 10px 12px; max-height: 180px; overflow-y: auto; overscroll-behavior: contain; }
 .activity-log-box pre { margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 10.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; color: #51646f; }
 :is([data-theme="dark"], [data-theme="cyberpunk"]) .activity-log-box { background: #192732; border-color: #273b4b; }

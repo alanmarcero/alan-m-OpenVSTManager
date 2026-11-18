@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld('manager',{
   openFolder:folder=>ipcRenderer.invoke('manager:openFolder',folder),
   openDataFolder:()=>ipcRenderer.invoke('manager:openDataFolder'),
   getActivityLog:()=>ipcRenderer.invoke('manager:getActivityLog'),
+  clearActivityLog:()=>ipcRenderer.invoke('manager:clearActivityLog'),
   clearCache:()=>ipcRenderer.invoke('manager:clearCache'),
   onProgress:callback=>{
     const listener=(_event,progress)=>callback(progress);

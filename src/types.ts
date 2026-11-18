@@ -116,6 +116,7 @@ export interface ManagerAPI {
   openFolder?(folder: string): Promise<void>;
   openDataFolder?(): Promise<void>;
   getActivityLog?(): Promise<string[]>;
+  clearActivityLog?(): Promise<string[]>;
   clearCache?(): Promise<ManagerState>;
   onProgress(callback: (progress: Progress) => void): () => void;
 }

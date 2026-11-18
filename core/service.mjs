@@ -7,6 +7,18 @@ import {downloadAsset} from './download.mjs';
 import {standardPathOptions,defaultPaths} from './installer.mjs';
 import {findAppUpdate,downloadAppUpdate,applyAppUpdate} from './updater.mjs';
 
+const FETCH_CONCURRENCY = 6;
+
+async function mapWithConcurrency(items, limit, worker) {
+  const queue = items.entries();
+  const count = Math.max(1, Math.min(limit, items.length || 1));
+  await Promise.all(Array.from({length: count}, async () => {
+    for (const [, item] of queue) {
+      await worker(item);
+    }
+  }));
+}
+
 export class ManagerService {
   constructor({dataDir,client,installer,platform=process.platform,arch=process.arch,appVersion,bundledCatalog,screenshotBaseUrl=null,onProgress=()=>{}}) {
     Object.assign(this,{dataDir,client,installer,platform,arch,appVersion,screenshotBaseUrl,onProgress});
@@ -55,7 +67,13 @@ export class ManagerService {
         ...(screenshotUrl ? {screenshotUrl} : {}),
         ...(result?.error ? {error:result.error} : {})};
     }));
-    const fetched=[...this.releases.values()].map(r=>r.fetchedAt).filter(Boolean);
+    const releaseEntries=[...this.releases.values()];
+    const fetched=releaseEntries.map(r=>r.fetchedAt).filter(Boolean);
+    const allReleasesStale=releaseEntries.length>0 && releaseEntries.every(r=>r.stale);
+    const hasHttpErrorResponse=releaseEntries.some(r=>Number.isInteger(r?.httpStatus)||/GitHub (?:rate limit|rejected|denied|returned \d+)|not found on GitHub/i.test(r?.error||''));
+    const appUpdateHttpError=Number.isInteger(this.appUpdate?.httpStatus)||/GitHub (?:rate limit|rejected|denied|returned \d+)/i.test(this.appUpdate?.error||'');
+    const offline=allReleasesStale && !hasHttpErrorResponse && !appUpdateHttpError;
+    const topLevelError=this.catalogError || (!offline && allReleasesStale ? releaseEntries.find(r=>r.error)?.error : undefined);
     return {
       platform:this.platform,
       arch:this.arch,
@@ -67,8 +85,8 @@ export class ManagerService {
       defaultBackupFolder:path.join(this.dataDir,'backups'),
       appUpdate:this.appUpdate,
       lastChecked:fetched.length?new Date(Math.min(...fetched)).toISOString():null,
-      offline:this.releases.size>0 && [...this.releases.values()].every(r=>r.stale),
-      ...(this.catalogError ? {error:this.catalogError} : {})
+      offline,
+      ...(topLevelError ? {error:topLevelError} : {})
     };
   }
   async refresh(){
@@ -81,12 +99,21 @@ export class ManagerService {
     const force=this.loaded;
     try{
       const result=await this.client.catalog({force});
-      this.catalog=validateCatalog(result.data);this.catalogError=result.error;
+      this.catalog=validateCatalog(result.data);
+      this.catalogError=result.stale && result.error && (Number.isInteger(result.httpStatus) || /GitHub/i.test(result.error)) ? result.error : null;
     }catch(error){this.catalogError=`Using the bundled plugin list. ${error.message}`;}
     await Promise.all([
-      ...this.catalog.map(async plugin=>{
+      mapWithConcurrency(this.catalog,FETCH_CONCURRENCY,async plugin=>{
         try{this.releases.set(plugin.id,await this.client.releases(plugin.repo,{force}));}
-        catch(error){this.releases.set(plugin.id,{...this.releases.get(plugin.id),data:this.releases.get(plugin.id)?.data || [],stale:true,error:error.message});}
+        catch(error){
+          this.releases.set(plugin.id,{
+            ...this.releases.get(plugin.id),
+            data:this.releases.get(plugin.id)?.data || [],
+            stale:true,
+            error:error.message,
+            ...(Number.isInteger(error?.httpStatus)?{httpStatus:error.httpStatus}:{})
+          });
+        }
         if(typeof this.client.screenshot==='function'){
           try{
             const shot=await this.client.screenshot(plugin.repo,plugin.screenshotPath,{force,includeData:false});
@@ -112,7 +139,7 @@ export class ManagerService {
       });
       return this.appUpdate;
     }catch(error){
-      this.appUpdate={available:false,currentVersion:this.appVersion,latestVersion:this.appVersion,error:error.message};
+      this.appUpdate={available:false,currentVersion:this.appVersion,latestVersion:this.appVersion,error:error.message,...(Number.isInteger(error?.httpStatus)?{httpStatus:error.httpStatus}:{})};
       return this.appUpdate;
     }
   }
@@ -185,9 +212,13 @@ export class ManagerService {
       throw error;
     }
     const tokenChanged=next.githubToken!==this.settings.githubToken;
+    const enabledAutoCheck=!this.settings.autoCheckAppUpdates && next.autoCheckAppUpdates;
     this.settings=next;
     if(this.loaded && tokenChanged){
       return this.refresh();
+    }
+    if(this.loaded && enabledAutoCheck){
+      await this.checkAppUpdate({force:false}).catch(()=>{});
     }
     return this.getState();
   }
@@ -196,6 +227,11 @@ export class ManagerService {
     const text=await readFile(file,'utf8').catch(error=>{if(error.code==='ENOENT')return '';throw error;});
     const lines=text.split(/\r?\n/).filter(Boolean);
     return lines.slice(-Math.max(1,limit)).reverse();
+  }
+  async clearActivityLog(){
+    const file=path.join(this.dataDir,'activity.log');
+    await rm(file,{force:true});
+    return [];
   }
   async clearCache(){
     if(this.busy)throw new Error('Another plugin operation is running. Wait for it to finish.');
@@ -209,13 +245,20 @@ export class ManagerService {
   selection({id,formats}){
     const plugin=this.catalog.find(p=>p.id===id);
     if(!plugin)throw new Error('Unknown plugin.');
-    if(!Array.isArray(formats)||!formats.length||formats.length>2||new Set(formats).size!==formats.length||formats.some(f=>!plugin.bundleNames[f]||(f==='AU'&&this.platform!=='darwin')))throw new Error('Choose a supported plugin format.');
+    if(!Array.isArray(formats)||!formats.length||formats.length>2||new Set(formats).size!==formats.length||new Set(formats).size===0||formats.some(f=>!plugin.bundleNames[f]||(f==='AU'&&this.platform!=='darwin')))throw new Error('Choose a supported plugin format.');
     return plugin;
   }
   async log(message){
     const file=path.join(this.dataDir,'activity.log');await mkdir(this.dataDir,{recursive:true});
     const size=await stat(file).then(s=>s.size).catch(()=>0);
-    if(size>256*1024)await writeFile(file,'');
+    if(size>256*1024){
+      const tail=await readFile(file).then(buf=>{
+        const slice=buf.subarray(Math.max(0,buf.length-128*1024));
+        const nl=slice.indexOf(0x0a);
+        return nl>=0?slice.subarray(nl+1):slice;
+      }).catch(()=>Buffer.alloc(0));
+      await writeFile(file,tail,{mode:0o600});
+    }
     await appendFile(file,`${new Date().toISOString()} ${message}\n`,{mode:0o600});
   }
   progress(id,phase,message,percent){this.onProgress({id,phase,message,...(percent===undefined?{}:{percent})});}
