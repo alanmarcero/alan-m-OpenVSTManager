@@ -13,7 +13,13 @@ function cleanReleaseNoteLines(notes: string): string[] {
   const withoutComments = (notes || '').replace(/<!--[\s\S]*?-->/g, '');
   const lines = withoutComments
     .split(/\r?\n/)
-    .map(line => line.replace(/!\[[^\]]*\]\([^)]*\)/g, '').trimEnd())
+    .map(line =>
+      line
+        .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+        .replace(/^\s*>\s?/, '')
+        .replace(/\s+in\s+https:\/\/github\.com\/[^/\s]+\/[^/\s]+\/pull\/(\d+)\b/gi, ' (#$1)')
+        .trimEnd()
+    )
     .filter(line => !/^\s*\*\*Full Changelog\*\*:\s*https?:\/\//i.test(line));
 
   while (lines.length && !lines[0].trim()) lines.shift();

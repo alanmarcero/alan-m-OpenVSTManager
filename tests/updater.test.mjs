@@ -270,3 +270,20 @@ test('downloadAppUpdate verifies ./ prefixed manifests and refuses silent checks
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test('downloadAppUpdate rejects untrusted checksum URLs before downloading installer and applyAppUpdate requires absolute paths', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'updater-sec-url-'));
+  try {
+    let fetched = false;
+    await assert.rejects(() => downloadAppUpdate({
+      asset: { name: 'OpenVSTManager.exe', url: 'https://github.com/app.exe', size: 10 },
+      checksumAsset: { name: 'SHA256SUMS.txt', url: 'https://evil.example/SHA256SUMS.txt' },
+      tempDir: dir,
+      fetchImpl: async () => { fetched = true; return new Response('x'); },
+    }), /untrusted/i);
+    assert.equal(fetched, false);
+    assert.throws(() => applyAppUpdate({ installerPath: 'relative/setup.exe', platform: 'win32' }), /Absolute installer path/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

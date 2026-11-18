@@ -69,7 +69,9 @@ svg { flex-shrink: 0; }
 .button-danger:hover:not(:disabled) { background: #894141; border-color: #894141; }
 .button-danger:disabled { opacity: .6; }
 .last-checked { font-size: 11px; color: #8a969e; padding-right: 1px; }
-.connection-notice { display: flex; align-items: flex-start; gap: 10px; color: #776847; background: #f1eee5; border-radius: 5px; padding: 12px 15px; margin: -8px 0 23px; font-size: 12px; line-height: 1.6; }
+.connection-notice { display: flex; align-items: center; gap: 10px; color: #776847; background: #f1eee5; border-radius: 5px; padding: 12px 15px; margin: -8px 0 23px; font-size: 12px; line-height: 1.6; }
+.notice-action { margin-left: auto; flex-shrink: 0; }
+.inline-hint { margin: 8px 0 0; font-size: 11px; color: #7b898f; }
 .connection-notice svg { margin-top: 1px; }
 
 .library-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 15px; padding-bottom: 26px; border-bottom: 1px solid var(--line); }

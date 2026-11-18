@@ -14,6 +14,7 @@ export interface PluginRelease {
   publishedAt: string;
   notes: string;
   url: string;
+  prerelease?: boolean;
   assets: ReleaseAsset[];
   availableFormats?: PluginFormat[];
 }

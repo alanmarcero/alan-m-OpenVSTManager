@@ -129,6 +129,8 @@ export async function downloadAppUpdate({
   maxBytes = 512 * 1024 * 1024,
 }) {
   if (!asset?.url || !asset?.name || !tempDir) throw new Error('Invalid download parameters.');
+  assertTrustedUpdateUrl(asset.url);
+  if (checksumAsset?.url) assertTrustedUpdateUrl(checksumAsset.url);
   const safeName = path.basename(asset.name);
   if (!safeName || safeName !== asset.name || safeName === '.' || safeName === '..' || /[\x00-\x1f\\/]/.test(safeName)) {
     throw new Error('Invalid update asset filename.');
@@ -221,7 +223,9 @@ export function applyAppUpdate({
   platform = process.platform,
   spawnImpl = spawn,
 }) {
-  if (!installerPath) throw new Error('Installer path required.');
+  if (typeof installerPath !== 'string' || !installerPath.trim() || !path.isAbsolute(installerPath)) {
+    throw new Error('Absolute installer path required.');
+  }
 
   if (platform === 'win32') {
     const child = spawnImpl(installerPath, [], {
