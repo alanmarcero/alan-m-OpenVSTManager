@@ -93,3 +93,12 @@ export function validateCatalog(value) {
       url:`https://github.com/alanmarcero/${p.repo}`, ...(typeof p.notice === 'string' ? {notice:p.notice.slice(0,1000)} : {}) };
   });
 }
+
+export function findPlugin(plugins, query) {
+  if (!Array.isArray(plugins) || typeof query !== 'string' || !query.trim()) return null;
+  const trimmed = query.trim();
+  const lower = trimmed.toLowerCase();
+  return plugins.find(p => p.id === trimmed || p.name === trimmed || p.aliases?.includes(trimmed))
+    || plugins.find(p => p.id.toLowerCase() === lower || p.name.toLowerCase() === lower || p.aliases?.some(a => a.toLowerCase() === lower))
+    || null;
+}

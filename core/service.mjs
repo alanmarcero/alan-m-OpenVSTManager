@@ -1,4 +1,4 @@
-import {mkdtemp,mkdir,rm,appendFile,stat,writeFile} from 'node:fs/promises';
+import {mkdtemp,mkdir,readdir,rm,appendFile,stat,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import semver from 'semver';
 import {readJSON,writeJSON} from './storage.mjs';
@@ -12,6 +12,15 @@ export class ManagerService {
     Object.assign(this,{dataDir,client,installer,platform,arch,appVersion,screenshotBaseUrl,onProgress});
     this.catalog=validateCatalog(bundledCatalog);this.releases=new Map();this.screenshots=new Map();this.settings=null;this.loaded=false;this.busy=false;
     this.appUpdate=null;
+  }
+  async cleanupTempDownloads(){
+    const tempRoot=path.join(this.dataDir,'downloads');
+    const entries=await readdir(tempRoot,{withFileTypes:true}).catch(()=>[]);
+    await Promise.allSettled(
+      entries
+        .filter(entry=>entry.isDirectory() && (entry.name.startsWith('install-') || entry.name.startsWith('update-')))
+        .map(entry=>rm(path.join(tempRoot,entry.name),{recursive:true,force:true}))
+    );
   }
   async init(){
     if(this.settings)return;
@@ -29,6 +38,7 @@ export class ManagerService {
       preferredFormats:Array.isArray(saved.preferredFormats) ? saved.preferredFormats : (this.platform==='darwin'?['VST3','AU']:['VST3']),
       githubToken:saved.githubToken || '',
     };
+    await this.cleanupTempDownloads().catch(()=>{});
   }
   async getState(){
     await this.init();
@@ -57,7 +67,7 @@ export class ManagerService {
       defaultBackupFolder:path.join(this.dataDir,'backups'),
       appUpdate:this.appUpdate,
       lastChecked:fetched.length?new Date(Math.min(...fetched)).toISOString():null,
-      offline:[...this.releases.values()].some(r=>r.stale),
+      offline:this.releases.size>0 && [...this.releases.values()].every(r=>r.stale),
       ...(this.catalogError ? {error:this.catalogError} : {})
     };
   }
@@ -124,13 +134,17 @@ export class ManagerService {
           asset:this.appUpdate.asset,
           checksumAsset:this.appUpdate.checksumAsset,
           tempDir:temporary,
+          appVersion:this.appVersion,
           onProgress:percent=>this.progress('manager-update','downloading-update',`Downloading OpenVST Manager v${this.appUpdate.latestVersion}`,percent),
           fetchImpl:this.client.fetch
         });
         this.progress('manager-update','installing-update','Launching OpenVST Manager update installer',100);
         applyAppUpdate({installerPath,platform:this.platform});
         return {success:true,installerPath};
-      }finally{}
+      }catch(error){
+        await rm(temporary,{recursive:true,force:true}).catch(()=>{});
+        throw error;
+      }
     });
   }
   validateSettings(patch){
@@ -195,26 +209,62 @@ export class ManagerService {
     }finally{this.busy=false;}
     return this.getState();
   }
+  async #installReleaseGroups({ plugin, release, groups, overwrite, progressId, phase, statusText, basePercent = 0, spanPercent = 100 }) {
+    const tempRoot = path.join(this.dataDir, 'downloads');
+    await mkdir(tempRoot, { recursive: true });
+    const temporary = await mkdtemp(path.join(tempRoot, 'install-'));
+    try {
+      for (const [index, { asset, formats }] of [...groups.values()].entries()) {
+        const archivePath = path.join(temporary, `${index}.zip`);
+        this.progress(progressId, phase === 'updating' ? 'downloading' : 'downloading', statusText.downloading, basePercent);
+        await downloadAsset({
+          asset,
+          repo: plugin.repo,
+          destination: archivePath,
+          appVersion: this.appVersion,
+          onProgress: percent => this.progress(progressId, 'downloading', statusText.downloading, Math.round(basePercent + (percent * spanPercent) / 100)),
+        });
+        this.progress(progressId, 'installing', statusText.installing, Math.min(99, Math.round(basePercent + spanPercent * 0.9)));
+        await this.installer.install({
+          plugin,
+          tag: release.tag,
+          archivePath,
+          formats,
+          digest: asset.digest,
+          overwrite: Boolean(overwrite),
+        });
+      }
+    } finally {
+      await rm(temporary, { recursive: true, force: true }).catch(() => {});
+    }
+  }
+  #groupReleaseAssets(release, formats) {
+    const groups = new Map();
+    for (const format of formats) {
+      const asset = selectAsset(release, format);
+      const group = groups.get(asset.url) || { asset, formats: [] };
+      group.formats.push(format);
+      groups.set(asset.url, group);
+    }
+    return groups;
+  }
   async install(request){
     await this.getState();
     const plugin=this.selection(request);
     const releases=normalizeReleases(this.releases.get(plugin.id)?.data || [],{platform:this.platform,arch:this.arch,repo:plugin.repo,includePrereleases:this.settings.includePrereleases});
     const release=releases.find(r=>r.tag===request.tag);
     if(!release)throw new Error('This release is unavailable. Refresh the library and choose a version.');
-    const groups=new Map();
-    for(const format of request.formats){const asset=selectAsset(release,format);const group=groups.get(asset.url)||{asset,formats:[]};group.formats.push(format);groups.set(asset.url,group);}
+    const groups=this.#groupReleaseAssets(release, request.formats);
     return this.operate(plugin.id,async()=>{
-      const tempRoot=path.join(this.dataDir,'downloads');await mkdir(tempRoot,{recursive:true});
-      const temporary=await mkdtemp(path.join(tempRoot,'install-'));
-      try{
-        for(const [index,{asset,formats}] of [...groups.values()].entries()){
-          const archivePath=path.join(temporary,`${index}.zip`);
-          this.progress(plugin.id,'downloading','Downloading from GitHub',0);
-          await downloadAsset({asset,repo:plugin.repo,destination:archivePath,onProgress:percent=>this.progress(plugin.id,'downloading','Downloading from GitHub',percent)});
-          this.progress(plugin.id,'installing','Verifying and installing');
-          await this.installer.install({plugin,tag:release.tag,archivePath,formats,digest:asset.digest,overwrite:Boolean(request.overwrite)});
-        }
-      }finally{await rm(temporary,{recursive:true,force:true}).catch(()=>{});}
+      await this.#installReleaseGroups({
+        plugin,
+        release,
+        groups,
+        overwrite: Boolean(request.overwrite),
+        progressId: plugin.id,
+        phase: 'installing',
+        statusText: { downloading: 'Downloading from GitHub', installing: 'Verifying and installing' },
+      });
     });
   }
   async move(request){
@@ -229,13 +279,22 @@ export class ManagerService {
     const plugins=this.catalog;
     return this.operate('all',async()=>{
       this.progress('all','moving','Moving installed plugins to current folder',0);
+      const failures=[];
       for(const [index,plugin] of plugins.entries()){
         const installed=await this.installer.detect(plugin);
         const formats=installed.filter(i=>i.managed).map(item=>item.format);
         if(formats.length){
-          await this.installer.move({plugin,formats,overwrite:true}).catch(()=>{});
+          try{
+            await this.installer.move({plugin,formats,overwrite:true});
+          }catch(error){
+            failures.push(`${plugin.name}: ${error.message}`);
+            await this.log(`moveAll (${plugin.id}): ${error.message}`).catch(()=>{});
+          }
         }
         this.progress('all','moving','Moving installed plugins to current folder',Math.round(((index+1)/plugins.length)*100));
+      }
+      if(failures.length){
+        throw new Error(`Could not move ${failures.length} plugin${failures.length===1?'':'s'}: ${failures.slice(0,2).join('; ')}`);
       }
     });
   }
@@ -267,40 +326,35 @@ export class ManagerService {
         candidates.push({ plugin, installed, release, formats });
       }
       this.progress('all', 'installing', 'Installing all plugins', 0);
+      const failures = [];
       for (const [index, { plugin, installed, release, formats }] of candidates.entries()) {
+        const basePercent = Math.round((index / candidates.length) * 100);
+        const spanPercent = 100 / candidates.length;
         try {
-          const groups = new Map();
-          for (const format of formats) {
-            const asset = selectAsset(release, format);
-            const group = groups.get(asset.url) || { asset, formats: [] };
-            group.formats.push(format);
-            groups.set(asset.url, group);
-          }
-
-          const tempRoot = path.join(this.dataDir, 'downloads');
-          await mkdir(tempRoot, { recursive: true });
-          const temporary = await mkdtemp(path.join(tempRoot, 'install-'));
-          try {
-            for (const [gIndex, { asset, formats: grpFormats }] of [...groups.values()].entries()) {
-              const archivePath = path.join(temporary, `${gIndex}.zip`);
-              const basePct = Math.round((index / candidates.length) * 100);
-              this.progress(plugin.id, 'downloading', `Downloading ${plugin.name} (${index + 1} of ${candidates.length})`, basePct);
-              await downloadAsset({
-                asset, repo: plugin.repo, destination: archivePath,
-                onProgress: percent => this.progress(plugin.id, 'downloading', `Downloading ${plugin.name} (${index + 1} of ${candidates.length})`, Math.round(basePct + (percent / candidates.length))),
-              });
-              this.progress(plugin.id, 'installing', `Installing ${plugin.name} (${index + 1} of ${candidates.length})`, Math.round(((index + 0.9) / candidates.length) * 100));
-              await this.installer.install({
-                plugin, tag: release.tag, archivePath, formats: grpFormats, digest: asset.digest, overwrite: Boolean(options.overwrite || installed.length > 0),
-              });
-            }
-          } finally {
-            await rm(temporary, { recursive: true, force: true }).catch(() => {});
-          }
+          const groups = this.#groupReleaseAssets(release, formats);
+          await this.#installReleaseGroups({
+            plugin,
+            release,
+            groups,
+            overwrite: Boolean(options.overwrite || installed.length > 0),
+            progressId: plugin.id,
+            phase: 'installing',
+            statusText: {
+              downloading: `Downloading ${plugin.name} (${index + 1} of ${candidates.length})`,
+              installing: `Installing ${plugin.name} (${index + 1} of ${candidates.length})`,
+            },
+            basePercent,
+            spanPercent,
+          });
+          this.progress(plugin.id, 'installing', `Installed ${plugin.name} (${index + 1} of ${candidates.length})`, Math.round(((index + 1) / candidates.length) * 100));
         } catch (error) {
+          failures.push(`${plugin.name}: ${error.message}`);
           await this.log(`installAll (${plugin.id}): ${error.message}`).catch(() => {});
         }
-        this.progress(plugin.id, 'installing', `Installed ${plugin.name} (${index + 1} of ${candidates.length})`, Math.round(((index + 1) / candidates.length) * 100));
+      }
+      if (failures.length) {
+        const installedOk = candidates.length - failures.length;
+        throw new Error(`Installed ${installedOk} of ${candidates.length} plugins; ${failures.length} failed (${failures.slice(0, 2).join('; ')}).`);
       }
     });
   }
@@ -308,57 +362,52 @@ export class ManagerService {
     await this.getState();
     const plugins = this.catalog;
     return this.operate('all', async () => {
+      const candidates = [];
+      for (const plugin of plugins) {
+        const installed = await this.installer.detect(plugin);
+        if (!installed.length) continue;
+        const releases = normalizeReleases(this.releases.get(plugin.id)?.data || [], {
+          platform: this.platform, arch: this.arch, repo: plugin.repo, includePrereleases: this.settings.includePrereleases,
+        });
+        const release = releases.find(r => r.assets.some(a => a.compatible));
+        if (!release) continue;
+        const formats = installed.filter(item => {
+          const current = semver.valid(item.version);
+          const latest = semver.valid(release.tag);
+          return Boolean(current && latest && semver.gt(latest, current));
+        }).map(item => item.format);
+        if (formats.length) candidates.push({ plugin, release, formats });
+      }
       this.progress('all', 'updating', 'Updating all plugins', 0);
-      for (const [index, plugin] of plugins.entries()) {
+      const failures = [];
+      for (const [index, { plugin, release, formats }] of candidates.entries()) {
+        const basePercent = Math.round((index / candidates.length) * 100);
+        const spanPercent = 100 / candidates.length;
         try {
-          const installed = await this.installer.detect(plugin);
-          if (!installed.length) continue;
-          const releases = normalizeReleases(this.releases.get(plugin.id)?.data || [], {
-            platform: this.platform, arch: this.arch, repo: plugin.repo, includePrereleases: this.settings.includePrereleases,
+          const groups = this.#groupReleaseAssets(release, formats);
+          await this.#installReleaseGroups({
+            plugin,
+            release,
+            groups,
+            overwrite: true,
+            progressId: plugin.id,
+            phase: 'updating',
+            statusText: {
+              downloading: `Downloading ${plugin.name} update (${index + 1} of ${candidates.length})`,
+              installing: `Updating ${plugin.name} (${index + 1} of ${candidates.length})`,
+            },
+            basePercent,
+            spanPercent,
           });
-          const release = releases.find(r => r.assets.some(a => a.compatible));
-          if (!release) continue;
-
-          const formatsToUpdate = installed.filter(item => {
-            const current = semver.valid(item.version);
-            const latest = semver.valid(release.tag);
-            return Boolean(current && latest && semver.gt(latest, current));
-          }).map(item => item.format);
-
-          if (!formatsToUpdate.length) continue;
-
-          const groups = new Map();
-          for (const format of formatsToUpdate) {
-            const asset = selectAsset(release, format);
-            const group = groups.get(asset.url) || { asset, formats: [] };
-            group.formats.push(format);
-            groups.set(asset.url, group);
-          }
-
-          const tempRoot = path.join(this.dataDir, 'downloads');
-          await mkdir(tempRoot, { recursive: true });
-          const temporary = await mkdtemp(path.join(tempRoot, 'install-'));
-          try {
-            for (const [gIndex, { asset, formats: grpFormats }] of [...groups.values()].entries()) {
-              const archivePath = path.join(temporary, `${gIndex}.zip`);
-              const basePct = Math.round((index / plugins.length) * 100);
-              this.progress(plugin.id, 'downloading', `Downloading ${plugin.name} update (${index + 1} of ${plugins.length})`, basePct);
-              await downloadAsset({
-                asset, repo: plugin.repo, destination: archivePath,
-                onProgress: percent => this.progress(plugin.id, 'downloading', `Downloading ${plugin.name} update (${index + 1} of ${plugins.length})`, Math.round(basePct + (percent / plugins.length))),
-              });
-              this.progress(plugin.id, 'installing', `Updating ${plugin.name} (${index + 1} of ${plugins.length})`, Math.round(((index + 0.9) / plugins.length) * 100));
-              await this.installer.install({
-                plugin, tag: release.tag, archivePath, formats: grpFormats, digest: asset.digest, overwrite: true,
-              });
-            }
-          } finally {
-            await rm(temporary, { recursive: true, force: true }).catch(() => {});
-          }
+          this.progress(plugin.id, 'updating', `Updated ${plugin.name} (${index + 1} of ${candidates.length})`, Math.round(((index + 1) / candidates.length) * 100));
         } catch (error) {
+          failures.push(`${plugin.name}: ${error.message}`);
           await this.log(`updateAll (${plugin.id}): ${error.message}`).catch(() => {});
         }
-        this.progress(plugin.id, 'updating', `Updated ${plugin.name} (${index + 1} of ${plugins.length})`, Math.round(((index + 1) / plugins.length) * 100));
+      }
+      if (failures.length) {
+        const updatedOk = candidates.length - failures.length;
+        throw new Error(`Updated ${updatedOk} of ${candidates.length} plugins; ${failures.length} failed (${failures.slice(0, 2).join('; ')}).`);
       }
     });
   }

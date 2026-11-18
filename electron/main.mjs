@@ -1,5 +1,5 @@
 import {app,BrowserWindow,ipcMain,dialog,shell,session,Menu,protocol,net} from 'electron';
-import {readFile} from 'node:fs/promises';
+import {mkdir,readFile,stat} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {Installer} from '../core/installer.mjs';
@@ -83,6 +83,27 @@ else {
         throw new Error('Only Alan Marcero website and GitHub links can be opened.');
       }
       await shell.openExternal(url.href);
+    },
+    openFolder:async value=>{
+      if(typeof value!=='string'||!value.trim()||!path.isAbsolute(value)||value.includes('\0'))throw new Error('Choose an absolute folder path.');
+      const resolved=path.resolve(value);
+      const state=await manager.getState();
+      const allowedRoots=[
+        ...Object.values(state.settings.paths||{}),
+        state.settings.backupFolder,
+        dataDir,
+      ].filter(Boolean).map(p=>path.resolve(p));
+      const allowedInstalls=state.plugins.flatMap(p=>p.installed.map(i=>path.resolve(i.path)));
+      const normalizeCmp=p=>process.platform==='win32'?p.toLowerCase():p;
+      const targetCmp=normalizeCmp(resolved);
+      const isAllowed=allowedRoots.some(r=>normalizeCmp(r)===targetCmp)
+        || allowedInstalls.some(p=>normalizeCmp(p)===targetCmp||normalizeCmp(path.dirname(p))===targetCmp);
+      if(!isAllowed)throw new Error('Only configured plugin, backup, or data folders can be opened.');
+      const info=await stat(resolved).catch(()=>null);
+      const folderToOpen=info&&!info.isDirectory()?path.dirname(resolved):resolved;
+      if(!info)await mkdir(folderToOpen,{recursive:true});
+      const openError=await shell.openPath(folderToOpen);
+      if(openError)throw new Error(openError);
     }
   };
   for(const [name,handler] of Object.entries(handlers))ipcMain.handle(`manager:${name}`,async(event,...args)=>{

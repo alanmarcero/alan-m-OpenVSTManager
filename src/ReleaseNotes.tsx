@@ -38,9 +38,13 @@ export function summarizeReleaseNotes(notes: string): string {
   return parts.join(' ').replace(/\s+/g, ' ').trim();
 }
 
+export function hasReleaseNotesContent(notes: string): boolean {
+  return cleanReleaseNoteLines(notes).length > 0;
+}
+
 function renderInline(text: string): ReactNode[] {
   const nodes: ReactNode[] = [];
-  const tokenPattern = /(\*\*[^*]+\*\*|`[^`]+`)/g;
+  const tokenPattern = /(\*\*[^*]+\*\*|\*[^*\n]+\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/g;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
   let key = 0;
@@ -51,8 +55,13 @@ function renderInline(text: string): ReactNode[] {
     const token = match[0];
     if (token.startsWith('**')) {
       nodes.push(<strong key={key++}>{token.slice(2, -2)}</strong>);
-    } else {
+    } else if (token.startsWith('*')) {
+      nodes.push(<em key={key++}>{token.slice(1, -1)}</em>);
+    } else if (token.startsWith('`')) {
       nodes.push(<code key={key++}>{token.slice(1, -1)}</code>);
+    } else {
+      const linkMatch = token.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+      nodes.push(<Fragment key={key++}>{linkMatch ? linkMatch[1] : token}</Fragment>);
     }
     lastIndex = match.index + token.length;
   }

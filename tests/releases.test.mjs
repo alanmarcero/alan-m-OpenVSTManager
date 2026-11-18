@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { compatibleAsset, normalizeReleases, selectAsset, validateCatalog } from '../core/releases.mjs';
+import { compatibleAsset, findPlugin, normalizeReleases, selectAsset, validateCatalog } from '../core/releases.mjs';
 
 const asset = (name, extras = {}) => ({name,browser_download_url:`https://github.com/alanmarcero/openMaster/releases/download/v1.0.0/${name}`,size:100,digest:'sha256:abcd',...extras});
 const release = (tag, extras = {}) => ({tag_name:tag,name:tag,draft:false,prerelease:false,published_at:'2026-10-01T00:00:00Z',body:'Notes',html_url:`https://github.com/alanmarcero/openMaster/releases/tag/${tag}`,assets:[asset('openMaster-VST3-macOS.zip')],...extras});
@@ -73,4 +73,15 @@ test('catalog validates screenshotPath and defaults to canonical preview screens
  assert.throws(() => validateCatalog([{ ...plugin, screenshotPath: '../secret.png' }]), /screenshot path/);
  assert.throws(() => validateCatalog([{ ...plugin, screenshotPath: '/abs/preview.png' }]), /screenshot path/);
  assert.throws(() => validateCatalog([{ ...plugin, screenshotPath: 'docs/readme.md' }]), /screenshot path/);
+});
+test('findPlugin resolves by id, name, or alias case-insensitively', () => {
+ const catalog = validateCatalog([
+  { id: 'openBassSpace', repo: 'openBassSpace', name: 'openBassSpace', description: 'Width', category: 'Mastering', aliases: ['openMaster'], bundleNames: { VST3: 'openBassSpace.vst3' } },
+  { id: 'openEDMKick', repo: 'openEDMKick', name: 'openKicker', description: 'Kick', category: 'Instrument', aliases: ['openKicker'], bundleNames: { VST3: 'openKicker.vst3' } },
+ ]);
+ assert.equal(findPlugin(catalog, 'openBassSpace')?.id, 'openBassSpace');
+ assert.equal(findPlugin(catalog, 'openmaster')?.id, 'openBassSpace');
+ assert.equal(findPlugin(catalog, 'openkicker')?.id, 'openEDMKick');
+ assert.equal(findPlugin(catalog, 'missing'), null);
+ assert.equal(findPlugin(catalog, ''), null);
 });

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,rm,readFile} from 'node:fs/promises';
+import {mkdtemp,mkdir,rm,readFile,access} from 'node:fs/promises';
 import path from 'node:path';
 import {tmpdir} from 'node:os';
 import {ManagerService} from '../core/service.mjs';
@@ -163,4 +163,73 @@ test('service attaches and auto-updates plugin screenshotUrl without failing on 
   const resilient = await service.refresh();
   assert.equal(resilient.offline, false);
   assert.equal(resilient.plugins[0].screenshotUrl, 'openvst://app/screenshots/openMaster.png?v=bbb222');
+});
+
+test('init cleans up stale temp downloads and offline requires all plugins to be stale', async t => {
+  const dataDir = await mkdtemp(path.join(tmpdir(), 'openvst-service-clean-'));
+  t.after(() => rm(dataDir, { recursive: true, force: true }));
+  const staleInstall = path.join(dataDir, 'downloads', 'install-old');
+  const staleUpdate = path.join(dataDir, 'downloads', 'update-old');
+  await mkdir(staleInstall, { recursive: true });
+  await mkdir(staleUpdate, { recursive: true });
+
+  const pluginA = { id: 'openA', repo: 'openA', name: 'A', description: 'A', category: 'FX', bundleNames: { VST3: 'openA.vst3' } };
+  const pluginB = { id: 'openB', repo: 'openB', name: 'B', description: 'B', category: 'FX', bundleNames: { VST3: 'openB.vst3' } };
+  const client = {
+    catalog: async () => ({ data: [pluginA, pluginB], stale: false }),
+    releases: async repo => {
+      if (repo === 'openA') throw new Error('404 Not Found');
+      return { data: [], stale: false, fetchedAt: 12345 };
+    },
+  };
+  const installer = { paths: { VST3: '/tmp/plugins' }, setPaths() {}, detect: async () => [] };
+  const service = new ManagerService({
+    dataDir, client, installer, platform: 'win32', arch: 'x64',
+    appVersion: '1.4.0', bundledCatalog: [pluginA, pluginB],
+  });
+
+  const state = await service.getState();
+  await assert.rejects(() => access(staleInstall));
+  await assert.rejects(() => access(staleUpdate));
+  assert.equal(state.offline, false);
+  assert.match(state.plugins[0].error, /404 Not Found/);
+  assert.equal(state.plugins[1].error, undefined);
+});
+
+test('installAll and updateAll report partial failures accurately', async t => {
+  const dataDir = await mkdtemp(path.join(tmpdir(), 'openvst-service-batch-'));
+  t.after(() => rm(dataDir, { recursive: true, force: true }));
+  const pluginA = { id: 'openA', repo: 'openA', name: 'Alpha', description: 'A', category: 'FX', bundleNames: { VST3: 'openA.vst3' } };
+  const pluginB = { id: 'openB', repo: 'openB', name: 'Beta', description: 'B', category: 'FX', bundleNames: { VST3: 'openB.vst3' } };
+  t.mock.method(globalThis, 'fetch', async () => new Response('zipdata'));
+  const client = {
+    catalog: async () => ({ data: [pluginA, pluginB], stale: false }),
+    releases: async repo => ({
+      data: [{
+        tag_name: 'v1.0.0',
+        published_at: '2026-10-20T00:00:00Z',
+        assets: [{ name: `${repo}-Windows.zip`, browser_download_url: `https://github.com/alanmarcero/${repo}/releases/download/v1.0.0/${repo}-Windows.zip`, size: 7 }],
+      }],
+      stale: false,
+      fetchedAt: 12345,
+    }),
+  };
+  const installedIds = [];
+  const installer = {
+    paths: { VST3: '/tmp/plugins' },
+    setPaths() {},
+    detect: async () => [],
+    install: async ({ plugin }) => {
+      if (plugin.id === 'openB') throw new Error('File in use');
+      installedIds.push(plugin.id);
+      return [];
+    },
+  };
+  const service = new ManagerService({
+    dataDir, client, installer, platform: 'win32', arch: 'x64',
+    appVersion: '1.4.0', bundledCatalog: [pluginA, pluginB],
+  });
+
+  await assert.rejects(() => service.installAll(), /Installed 1 of 2 plugins; 1 failed \(Beta: File in use\)/);
+  assert.deepEqual(installedIds, ['openA']);
 });

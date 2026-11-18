@@ -2,15 +2,17 @@ import {open,rm} from 'node:fs/promises';
 import {trustedAssetURL} from './releases.mjs';
 
 const CDN_HOSTS=new Set(['release-assets.githubusercontent.com','objects.githubusercontent.com','github.com']);
-export async function downloadAsset({asset,repo,destination,onProgress=()=>{},fetchImpl=fetch,maxBytes=512*1024*1024}) {
+export async function downloadAsset({asset,repo,destination,appVersion='1.4.0',onProgress=()=>{},fetchImpl=fetch,maxBytes=512*1024*1024}) {
   if(!trustedAssetURL(asset.url,repo))throw new Error('Download is not a release from this plugin repository.');
   if(asset.size>maxBytes)throw new Error('Download exceeds the size limit.');
   let response,url=asset.url;
   const signal=AbortSignal.timeout(5*60*1000);
   for(let redirects=0;redirects<6;redirects++){
-    response=await fetchImpl(url,{redirect:'manual',signal,headers:{'User-Agent':'OpenVSTManager/1.1.0'}});
+    response=await fetchImpl(url,{redirect:'manual',signal,headers:{'User-Agent':`OpenVSTManager/${appVersion}`}});
     if(![301,302,303,307,308].includes(response.status))break;
-    const target=new URL(response.headers.get('location'),url);
+    const location=response.headers.get('location');
+    if(!location)throw new Error('Download redirect is missing a target location.');
+    const target=new URL(location,url);
     if(target.protocol!=='https:' || target.port || target.username || target.password || !CDN_HOSTS.has(target.hostname))throw new Error('Refused an unsafe download redirect.');
     await response.body?.cancel();
     url=target.href;

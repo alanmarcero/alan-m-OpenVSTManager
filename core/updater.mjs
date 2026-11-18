@@ -7,6 +7,19 @@ import semver from 'semver';
 
 const CDN_HOSTS = new Set(['release-assets.githubusercontent.com', 'objects.githubusercontent.com', 'github.com']);
 
+function assertTrustedUpdateUrl(value) {
+  let target;
+  try {
+    target = new URL(value);
+  } catch {
+    throw new Error('Invalid update download URL.');
+  }
+  if (target.protocol !== 'https:' || target.port || target.username || target.password || !CDN_HOSTS.has(target.hostname)) {
+    throw new Error('Refused an untrusted update download URL.');
+  }
+  return target.href;
+}
+
 export function findAppUpdate({
   currentVersion,
   platform = process.platform,
@@ -81,17 +94,19 @@ export function findAppUpdate({
   return { available: false, currentVersion, latestVersion: currentVersion };
 }
 
-async function fetchWithRedirects(url, { maxRedirects = 6, fetchImpl = fetch, timeoutMs = 60_000 } = {}) {
-  let response, currentUrl = url;
+async function fetchWithRedirects(url, { maxRedirects = 6, fetchImpl = fetch, timeoutMs = 60_000, appVersion = '1.4.0' } = {}) {
+  let response, currentUrl = assertTrustedUpdateUrl(url);
   const signal = AbortSignal.timeout(timeoutMs);
   for (let redirects = 0; redirects < maxRedirects; redirects++) {
     response = await fetchImpl(currentUrl, {
       redirect: 'manual',
       signal,
-      headers: { 'User-Agent': 'OpenVSTManager-Updater' },
+      headers: { 'User-Agent': `OpenVSTManager/${appVersion}` },
     });
     if (![301, 302, 303, 307, 308].includes(response.status)) break;
-    const target = new URL(response.headers.get('location'), currentUrl);
+    const location = response.headers.get('location');
+    if (!location) throw new Error('Download redirect is missing a target location.');
+    const target = new URL(location, currentUrl);
     if (target.protocol !== 'https:' || target.port || target.username || target.password || !CDN_HOSTS.has(target.hostname)) {
       throw new Error('Refused an unsafe download redirect.');
     }
@@ -108,15 +123,23 @@ export async function downloadAppUpdate({
   asset,
   checksumAsset,
   tempDir,
+  appVersion = '1.4.0',
   onProgress = () => {},
   fetchImpl = fetch,
   maxBytes = 512 * 1024 * 1024,
 }) {
-  if (!asset?.url || !tempDir) throw new Error('Invalid download parameters.');
-  const destination = path.join(tempDir, asset.name);
+  if (!asset?.url || !asset?.name || !tempDir) throw new Error('Invalid download parameters.');
+  const safeName = path.basename(asset.name);
+  if (!safeName || safeName !== asset.name || safeName === '.' || safeName === '..' || /[\x00-\x1f\\/]/.test(safeName)) {
+    throw new Error('Invalid update asset filename.');
+  }
+  if (asset.size > maxBytes) {
+    throw new Error('Download exceeds size limit.');
+  }
+  const destination = path.join(tempDir, safeName);
 
   // Download main update asset
-  const response = await fetchWithRedirects(asset.url, { fetchImpl, timeoutMs: 5 * 60 * 1000 });
+  const response = await fetchWithRedirects(asset.url, { fetchImpl, timeoutMs: 5 * 60 * 1000, appVersion });
   const length = Number(response.headers.get('content-length')) || asset.size || 0;
   if (length > maxBytes) {
     await response.body.cancel();
@@ -146,7 +169,7 @@ export async function downloadAppUpdate({
   // Verify sha256 checksum if available
   if (checksumAsset?.url) {
     try {
-      const shaResponse = await fetchWithRedirects(checksumAsset.url, { fetchImpl, timeoutMs: 30_000 });
+      const shaResponse = await fetchWithRedirects(checksumAsset.url, { fetchImpl, timeoutMs: 30_000, appVersion });
       const shaText = await shaResponse.text();
       let expectedHash = null;
       for (const line of shaText.split('\n')) {
