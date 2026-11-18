@@ -310,12 +310,25 @@ function PluginRow({ plugin, selected, busy, progress, showUpdateNotes = false, 
   const workingAction = busy?.id === plugin.id
     ? (busy.action === 'Installing' && update ? 'Updating…' : `${busy.action}…`)
     : (progress?.phase === 'updating' ? 'Updating…' : 'Installing…');
-  return <button className={`plugin-row ${selected ? 'selected' : ''}`} onClick={onSelect} aria-pressed={selected}>
+  const [notesOpen, setNotesOpen] = useState(false);
+  const notesId = `row-notes-${plugin.id}`;
+  return <>
+  <button className={`plugin-row ${selected ? 'selected' : ''}`} onClick={onSelect} aria-pressed={selected}>
     <PluginGlyph id={plugin.id} />
     <span className="plugin-row-copy"><span className="plugin-name">{plugin.name}</span><span className="plugin-category">{plugin.category}</span>{updateSummary && <span className="plugin-update-summary">{updateSummary}</span>}</span>
     <span className="plugin-row-status"><span className="plugin-version">{release ? formatVersion(release.tag) : '—'}</span><span className={`status-label ${update ? 'status-update' : installed ? 'status-installed' : ''}`}>{isWorking ? <><LoaderCircle size={11} className="spin" />{workingAction}</> : update ? <><span className="status-dot" />Update available</> : installed ? <><Check size={12} />Installed</> : plugin.error ? 'Release unavailable' : isAvailable(release) ? plugin.formats.join(' / ') : 'Source available'}</span></span>
     <ChevronRight className="row-chevron" size={14} />
-  </button>;
+  </button>
+  {updateSummary && latestRelease && <div className="plugin-row-notes">
+    <button type="button" className="notes-toggle" aria-expanded={notesOpen} aria-controls={notesId} onClick={() => setNotesOpen(open => !open)}>
+      <ChevronDown size={13} className={notesOpen ? 'notes-toggle-open' : ''} aria-hidden="true" />
+      <span>{notesOpen ? 'Hide full notes' : 'Show full notes'}</span>
+    </button>
+    {notesOpen && <div id={notesId} className="plugin-row-notes-body" role="region" aria-label={`Full release notes for ${plugin.name} ${formatVersion(latestRelease.tag)}`}>
+      <ReleaseNotesBody notes={latestRelease.notes} />
+    </div>}
+  </div>}
+  </>;
 }
 
 function PluginDetail({ plugin, state, busy, progress, openExternal, install, uninstall, move }: {

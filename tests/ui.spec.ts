@@ -250,5 +250,14 @@ test('shows latest release notes when updates exist, renders auto-updating scree
 
   await page.getByRole('button', { name: 'Updates', exact: true }).click();
   await expect(page.locator('.plugin-row .plugin-update-summary')).toContainText('Adds analog drive curves and LFO sync refinements.');
+  const toggle = page.getByRole('button', { name: 'Show full notes' });
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByRole('region', { name: /Full release notes for openEDMFilter/ })).toHaveCount(0);
+  await toggle.click();
+  const fullNotes = page.getByRole('region', { name: /Full release notes for openEDMFilter/ });
+  await expect(fullNotes).toContainText('Improved filter envelope tracking.');
+  await expectSeparatedControls(page);
+  await page.getByRole('button', { name: 'Hide full notes' }).click();
+  await expect(fullNotes).toHaveCount(0);
   await expectSeparatedControls(page);
 });
