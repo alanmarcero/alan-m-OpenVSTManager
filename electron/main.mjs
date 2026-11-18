@@ -19,22 +19,35 @@ else {
   app.whenReady().then(async()=>{
   session.defaultSession.setPermissionRequestHandler((_contents,_permission,callback)=>callback(false));
   session.defaultSession.setPermissionCheckHandler(()=>false);
-  protocol.handle('openvst',request=>{
+  const dataDir=app.getPath('userData');
+  const bundledCatalog=JSON.parse(await readFile(path.join(root,'catalog.json'),'utf8'));
+  const client=new GitHubClient({cacheDir:path.join(dataDir,'cache'),appVersion:app.getVersion()});
+  const manager=new ManagerService({dataDir,
+    client,
+    installer:new Installer({dataDir,plugins:bundledCatalog}),
+    appVersion:app.getVersion(),bundledCatalog,
+    screenshotBaseUrl:`${origin}/screenshots`,
+    onProgress:progress=>{if(window&&!window.isDestroyed())window.webContents.send('manager:progress',progress);}
+  });
+  protocol.handle('openvst',async request=>{
     const url=new URL(request.url);
     if(url.hostname!=='app')return new Response('Forbidden',{status:403});
     let pathname;
     try{pathname=decodeURIComponent(url.pathname);}catch{return new Response('Bad request',{status:400});}
+    if(pathname.startsWith('/screenshots/')){
+      const id=pathname.slice('/screenshots/'.length).replace(/\.png$/i,'');
+      const plugin=manager.catalog.find(p=>p.id===id);
+      if(!plugin)return new Response('Not found',{status:404});
+      try{
+        const shot=await client.screenshot(plugin.repo,plugin.screenshotPath);
+        return new Response(shot.data,{status:200,headers:{'Content-Type':shot.contentType,'Cache-Control':'no-store'}});
+      }catch{
+        return new Response('Not found',{status:404});
+      }
+    }
     const file=path.resolve(root,'dist','.'+(pathname==='/'?'/index.html':pathname));
     if(!file.startsWith(path.join(root,'dist')+path.sep))return new Response('Forbidden',{status:403});
     return net.fetch(pathToFileURL(file).href);
-  });
-  const dataDir=app.getPath('userData');
-  const bundledCatalog=JSON.parse(await readFile(path.join(root,'catalog.json'),'utf8'));
-  const manager=new ManagerService({dataDir,
-    client:new GitHubClient({cacheDir:path.join(dataDir,'cache')}),
-    installer:new Installer({dataDir,plugins:bundledCatalog}),
-    appVersion:app.getVersion(),bundledCatalog,
-    onProgress:progress=>{if(window&&!window.isDestroyed())window.webContents.send('manager:progress',progress);}
   });
   const handlers={
     getState:()=>manager.getState(),refresh:()=>manager.refresh(),
@@ -64,7 +77,11 @@ else {
     },
     openExternal:async value=>{
       const url=new URL(value);
-      if(url.protocol!=='https:'||url.hostname!=='github.com'||url.username||url.password||url.port||!url.pathname.startsWith('/alanmarcero/'))throw new Error('Only Alan Marcero GitHub project links can be opened.');
+      const isGitHub = url.hostname === 'github.com' && (url.pathname === '/alanmarcero' || url.pathname.startsWith('/alanmarcero/'));
+      const isWebsite = url.hostname === 'alanmarcero.com' || url.hostname === 'www.alanmarcero.com';
+      if(url.protocol!=='https:' || (!isGitHub && !isWebsite) || url.username || url.password || url.port) {
+        throw new Error('Only Alan Marcero website and GitHub links can be opened.');
+      }
       await shell.openExternal(url.href);
     }
   };

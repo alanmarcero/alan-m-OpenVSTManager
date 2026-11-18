@@ -1,10 +1,50 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <defs>
-    <linearGradient id="body" x2="0" y2="1"><stop stop-color="#344952"/><stop offset="1" stop-color="#22343d"/></linearGradient>
-    <linearGradient id="silver" x1="0" y1="0" x2="0.8" y2="1"><stop stop-color="#ffffff"/><stop offset=".5" stop-color="#c4d4d9"/><stop offset="1" stop-color="#92b4ba"/></linearGradient>
+    <linearGradient id="chassis" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#223540"/>
+      <stop offset="0.55" stop-color="#142129"/>
+      <stop offset="1" stop-color="#0b141a"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.42" r="0.52">
+      <stop offset="0" stop-color="#4fd2dc" stop-opacity="0.28"/>
+      <stop offset="0.65" stop-color="#2e838e" stop-opacity="0.08"/>
+      <stop offset="1" stop-color="#0b141a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#87c8d0" stop-opacity="0.72"/>
+      <stop offset="0.5" stop-color="#3c606d" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#6ccdd7" stop-opacity="0.55"/>
+    </linearGradient>
+    <linearGradient id="frame" x1="0.1" y1="0" x2="0.9" y2="1">
+      <stop offset="0" stop-color="#8cf0f6"/>
+      <stop offset="0.5" stop-color="#4bc2cd"/>
+      <stop offset="1" stop-color="#2f8592"/>
+    </linearGradient>
+    <linearGradient id="bars" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.55" stop-color="#cbe7ec"/>
+      <stop offset="1" stop-color="#7dc7d1"/>
+    </linearGradient>
   </defs>
-  <rect x="24" y="24" width="976" height="976" rx="222" fill="url(#body)"/>
-  <rect x="25" y="25" width="974" height="974" rx="221" fill="none" stroke="#60767e" stroke-opacity=".5" stroke-width="2"/>
-  <path d="M202 550 C250 550 257 398 305 398 S367 682 420 682 S489 300 545 300 S609 606 664 606 S728 474 779 474" fill="none" stroke="#142830" stroke-opacity=".4" stroke-width="65" stroke-linecap="round" transform="translate(0 14)"/>
-  <path d="M202 550 C250 550 257 398 305 398 S367 682 420 682 S489 300 545 300 S609 606 664 606 S728 474 779 474" fill="none" stroke="url(#silver)" stroke-width="56" stroke-linecap="round"/>
+  <rect x="28" y="28" width="968" height="968" rx="224" fill="url(#chassis)"/>
+  <rect x="28" y="28" width="968" height="968" rx="224" fill="url(#glow)"/>
+  <rect x="30" y="30" width="964" height="964" rx="222" fill="none" stroke="url(#rim)" stroke-width="4"/>
+  <!-- Recessed hexagonal/octagonal studio rack bezel -->
+  <path d="M512 152 L808 296 L844 612 L680 848 L344 848 L180 612 L216 296 Z" fill="#0d1820" fill-opacity="0.55" stroke="url(#frame)" stroke-width="22" stroke-linejoin="round"/>
+  <!-- Inner rack channel -->
+  <path d="M512 204 L760 326 L790 594 L650 794 L374 794 L234 594 L264 326 Z" fill="none" stroke="#6ee2eb" stroke-opacity="0.22" stroke-width="4" stroke-linejoin="round"/>
+  <!-- Five sculpted VST harmonic fader columns + stereo signal crest -->
+  <g fill="url(#bars)">
+    <rect x="314" y="458" width="46" height="176" rx="23" opacity="0.72"/>
+    <rect x="396" y="370" width="48" height="264" rx="24" opacity="0.88"/>
+    <rect x="486" y="294" width="52" height="340" rx="26"/>
+    <rect x="580" y="370" width="48" height="264" rx="24" opacity="0.88"/>
+    <rect x="664" y="458" width="46" height="176" rx="23" opacity="0.72"/>
+  </g>
+  <!-- Sync / install vector chevron at base -->
+  <path d="M394 694 L512 756 L630 694" fill="none" stroke="url(#frame)" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Pilot LED accents -->
+  <circle cx="512" cy="236" r="14" fill="#8df5f9"/>
+  <circle cx="290" cy="340" r="8" fill="#5cccd6" fill-opacity="0.7"/>
+  <circle cx="734" cy="340" r="8" fill="#5cccd6" fill-opacity="0.7"/>
 </svg>

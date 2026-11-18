@@ -8,9 +8,9 @@ import {standardPathOptions,defaultPaths} from './installer.mjs';
 import {findAppUpdate,downloadAppUpdate,applyAppUpdate} from './updater.mjs';
 
 export class ManagerService {
-  constructor({dataDir,client,installer,platform=process.platform,arch=process.arch,appVersion,bundledCatalog,onProgress=()=>{}}) {
-    Object.assign(this,{dataDir,client,installer,platform,arch,appVersion,onProgress});
-    this.catalog=validateCatalog(bundledCatalog);this.releases=new Map();this.settings=null;this.loaded=false;this.busy=false;
+  constructor({dataDir,client,installer,platform=process.platform,arch=process.arch,appVersion,bundledCatalog,screenshotBaseUrl=null,onProgress=()=>{}}) {
+    Object.assign(this,{dataDir,client,installer,platform,arch,appVersion,screenshotBaseUrl,onProgress});
+    this.catalog=validateCatalog(bundledCatalog);this.releases=new Map();this.screenshots=new Map();this.settings=null;this.loaded=false;this.busy=false;
     this.appUpdate=null;
   }
   async init(){
@@ -35,9 +35,14 @@ export class ManagerService {
     if(!this.loaded)return this.refresh();
     const plugins=await Promise.all(this.catalog.map(async plugin=>{
       const result=this.releases.get(plugin.id);
+      const screenshot=this.screenshots.get(plugin.id);
+      const screenshotUrl=this.screenshotBaseUrl && screenshot?.version
+        ? `${this.screenshotBaseUrl}/${encodeURIComponent(plugin.id)}.png?v=${screenshot.version}`
+        : undefined;
       return {...plugin,formats:Object.keys(plugin.bundleNames).filter(f=>f==='VST3'||this.platform==='darwin'),
         installed:await this.installer.detect(plugin),
         releases:normalizeReleases(result?.data || [],{platform:this.platform,arch:this.arch,repo:plugin.repo,includePrereleases:this.settings.includePrereleases}),
+        ...(screenshotUrl ? {screenshotUrl} : {}),
         ...(result?.error ? {error:result.error} : {})};
     }));
     const fetched=[...this.releases.values()].map(r=>r.fetchedAt).filter(Boolean);
@@ -71,6 +76,12 @@ export class ManagerService {
     await Promise.all(this.catalog.map(async plugin=>{
       try{this.releases.set(plugin.id,await this.client.releases(plugin.repo,{force}));}
       catch(error){this.releases.set(plugin.id,{...this.releases.get(plugin.id),data:this.releases.get(plugin.id)?.data || [],stale:true,error:error.message});}
+      if(typeof this.client.screenshot==='function'){
+        try{
+          const shot=await this.client.screenshot(plugin.repo,plugin.screenshotPath,{force,includeData:false});
+          this.screenshots.set(plugin.id,shot);
+        }catch{}
+      }
     }));
     if(this.settings.autoCheckAppUpdates){
       await this.checkAppUpdate({force}).catch(()=>{});

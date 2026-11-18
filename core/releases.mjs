@@ -45,6 +45,24 @@ export function selectAsset(release, format) {
   return asset;
 }
 
+export const DEFAULT_SCREENSHOT_PATH = 'docs/screenshots/preview.png';
+
+export function normalizeScreenshotPath(value) {
+  if (value == null) return DEFAULT_SCREENSHOT_PATH;
+  if (
+    typeof value !== 'string' ||
+    !value.length ||
+    value.length > 260 ||
+    !/^[A-Za-z0-9._/-]+$/.test(value) ||
+    value.startsWith('/') ||
+    value.includes('..') ||
+    !/\.(png|jpe?g|webp)$/i.test(value)
+  ) {
+    throw new Error('Invalid catalog screenshot path.');
+  }
+  return value;
+}
+
 export function validateCatalog(value) {
   if (!Array.isArray(value) || value.length === 0 || value.length > 100) throw new Error('Invalid plugin catalog.');
   const ids = new Set();
@@ -69,7 +87,8 @@ export function validateCatalog(value) {
       }
       aliases = [...p.aliases];
     }
-    return { id:p.id,repo:p.repo,name:p.name,description:p.description,category:p.category,bundleNames,
+    const screenshotPath = normalizeScreenshotPath(p.screenshotPath);
+    return { id:p.id,repo:p.repo,name:p.name,description:p.description,category:p.category,bundleNames,screenshotPath,
       ...(aliases ? { aliases } : {}),
       url:`https://github.com/alanmarcero/${p.repo}`, ...(typeof p.notice === 'string' ? {notice:p.notice.slice(0,1000)} : {}) };
   });

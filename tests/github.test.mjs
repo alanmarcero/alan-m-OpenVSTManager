@@ -46,3 +46,38 @@ test('release notes preserve multibyte text split across network chunks',async t
  const client=await setup(t,async()=>new Response(new ReadableStream({start(controller){controller.enqueue(bytes.subarray(0,split));controller.enqueue(bytes.subarray(split));controller.close();}})));
  assert.equal((await client.releases('openMaster')).data[0].body,'Café');
 });
+test('screenshots cache via ETag, update version when bytes change, and reject invalid payloads',async t=>{
+ const png1=Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a,0x00,0x00,0x00,0x01]);
+ const png2=Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a,0x00,0x00,0x00,0x02]);
+ let mode='first',seenIfNoneMatch=null;
+ const client=await setup(t,async(url,init)=>{
+  assert.equal(url,'https://raw.githubusercontent.com/alanmarcero/openEDMDelay/main/docs/screenshots/preview.png');
+  seenIfNoneMatch=init?.headers?.['If-None-Match'] || null;
+  if(mode==='first')return new Response(png1,{headers:{etag:'"v1"'}});
+  if(mode==='not-modified')return new Response(null,{status:304,headers:{etag:'"v1"'}});
+  if(mode==='updated')return new Response(png2,{headers:{etag:'"v2"'}});
+  if(mode==='invalid')return new Response('not-an-image');
+  throw new Error('network down');
+ });
+ const first=await client.screenshot('openEDMDelay');
+ assert.equal(first.contentType,'image/png');
+ assert.deepEqual(first.data,png1);
+ assert.equal(first.stale,false);
+ mode='not-modified';
+ const same=await client.screenshot('openEDMDelay',{force:true});
+ assert.equal(seenIfNoneMatch,'"v1"');
+ assert.equal(same.version,first.version);
+ assert.deepEqual(same.data,png1);
+ mode='invalid';
+ const fallback=await client.screenshot('openEDMDelay',{force:true});
+ assert.equal(fallback.stale,true);
+ assert.equal(fallback.version,first.version);
+ mode='updated';
+ const updated=await client.screenshot('openEDMDelay',{force:true});
+ assert.notEqual(updated.version,first.version);
+ assert.deepEqual(updated.data,png2);
+ mode='offline';
+ const offline=await client.screenshot('openEDMDelay',{force:true});
+ assert.equal(offline.stale,true);
+ assert.deepEqual(offline.data,png2);
+});
