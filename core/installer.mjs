@@ -67,17 +67,30 @@ function bundleNames(plugin, format) {
   return names;
 }
 
+function normalizeBundleVersion(raw) {
+  if (typeof raw !== 'string') return null;
+  let trimmed = raw.trim();
+  if (!trimmed) return null;
+  const fourPart = trimmed.match(/^v?(\d+\.\d+\.\d+)\.0$/);
+  if (fourPart) trimmed = fourPart[1];
+  const normalized = trimmed.startsWith('v') ? trimmed : `v${trimmed}`;
+  return semver.valid(normalized) ? normalized : null;
+}
+
 async function detectBundleVersion(bundlePath, format) {
   try {
     if (format === 'VST3') {
       const moduleInfoPath = path.join(bundlePath, 'Contents', 'Resources', 'moduleinfo.json');
       const text = await fs.readFile(moduleInfoPath, 'utf8').catch(() => null);
       if (text) {
-        const match = text.match(/"Version"\s*:\s*"([^"]+)"/i);
-        if (match && match[1]) {
-          const v = match[1].trim();
-          const normalized = v.startsWith('v') ? v : `v${v}`;
-          if (semver.valid(normalized)) return normalized;
+        try {
+          const parsed = JSON.parse(text);
+          const version = normalizeBundleVersion(parsed?.Version ?? parsed?.version);
+          if (version) return version;
+        } catch {
+          const match = text.match(/"Version"\s*:\s*"([^"]+)"/i);
+          const version = normalizeBundleVersion(match?.[1]);
+          if (version) return version;
         }
       }
     }
@@ -86,11 +99,8 @@ async function detectBundleVersion(bundlePath, format) {
     if (plistText) {
       const match = plistText.match(/<key>CFBundleShortVersionString<\/key>\s*<string>([^<]+)<\/string>/i)
         || plistText.match(/<key>CFBundleVersion<\/key>\s*<string>([^<]+)<\/string>/i);
-      if (match && match[1]) {
-        const v = match[1].trim();
-        const normalized = v.startsWith('v') ? v : `v${v}`;
-        if (semver.valid(normalized)) return normalized;
-      }
+      const version = normalizeBundleVersion(match?.[1]);
+      if (version) return version;
     }
   } catch { /* Version introspection is best-effort */ }
   return null;

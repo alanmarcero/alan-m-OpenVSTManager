@@ -4,6 +4,7 @@ import path from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {Installer} from '../core/installer.mjs';
 import {GitHubClient} from '../core/github.mjs';
+import {findPlugin} from '../core/releases.mjs';
 import {ManagerService} from '../core/service.mjs';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
@@ -36,7 +37,7 @@ else {
     try{pathname=decodeURIComponent(url.pathname);}catch{return new Response('Bad request',{status:400});}
     if(pathname.startsWith('/screenshots/')){
       const id=pathname.slice('/screenshots/'.length).replace(/\.png$/i,'');
-      const plugin=manager.catalog.find(p=>p.id===id);
+      const plugin=findPlugin(manager.catalog,id);
       if(!plugin)return new Response('Not found',{status:404});
       try{
         const shot=await client.screenshot(plugin.repo,plugin.screenshotPath);
@@ -59,10 +60,17 @@ else {
     checkAppUpdate:()=>manager.checkAppUpdate({force:true}),
     installAppUpdate:async()=>{
       const result=await manager.installAppUpdate();
-      if(result?.success && process.platform==='win32'){
+      if(result?.success && result?.launched && process.platform==='win32'){
         setTimeout(()=>app.quit(), 800);
       }
       return result;
+    },
+    getActivityLog:()=>manager.getActivityLog(),
+    clearCache:()=>manager.clearCache(),
+    openDataFolder:async()=>{
+      await mkdir(dataDir,{recursive:true});
+      const openError=await shell.openPath(dataDir);
+      if(openError)throw new Error(openError);
     },
     chooseDirectory:async format=>{
       if(!['VST3','AU'].includes(format))throw new Error('Unknown plugin format.');

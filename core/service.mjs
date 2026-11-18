@@ -1,4 +1,4 @@
-import {mkdtemp,mkdir,readdir,rm,appendFile,stat,writeFile} from 'node:fs/promises';
+import {mkdtemp,mkdir,readdir,readFile,rm,appendFile,stat,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import semver from 'semver';
 import {readJSON,writeJSON} from './storage.mjs';
@@ -83,19 +83,19 @@ export class ManagerService {
       const result=await this.client.catalog({force});
       this.catalog=validateCatalog(result.data);this.catalogError=result.error;
     }catch(error){this.catalogError=`Using the bundled plugin list. ${error.message}`;}
-    await Promise.all(this.catalog.map(async plugin=>{
-      try{this.releases.set(plugin.id,await this.client.releases(plugin.repo,{force}));}
-      catch(error){this.releases.set(plugin.id,{...this.releases.get(plugin.id),data:this.releases.get(plugin.id)?.data || [],stale:true,error:error.message});}
-      if(typeof this.client.screenshot==='function'){
-        try{
-          const shot=await this.client.screenshot(plugin.repo,plugin.screenshotPath,{force,includeData:false});
-          this.screenshots.set(plugin.id,shot);
-        }catch{}
-      }
-    }));
-    if(this.settings.autoCheckAppUpdates){
-      await this.checkAppUpdate({force}).catch(()=>{});
-    }
+    await Promise.all([
+      ...this.catalog.map(async plugin=>{
+        try{this.releases.set(plugin.id,await this.client.releases(plugin.repo,{force}));}
+        catch(error){this.releases.set(plugin.id,{...this.releases.get(plugin.id),data:this.releases.get(plugin.id)?.data || [],stale:true,error:error.message});}
+        if(typeof this.client.screenshot==='function'){
+          try{
+            const shot=await this.client.screenshot(plugin.repo,plugin.screenshotPath,{force,includeData:false});
+            this.screenshots.set(plugin.id,shot);
+          }catch{}
+        }
+      }),
+      ...(this.settings.autoCheckAppUpdates ? [this.checkAppUpdate({force}).catch(()=>{})] : []),
+    ]);
     this.loaded=true;
     return this.getState();
   }
@@ -139,8 +139,8 @@ export class ManagerService {
           fetchImpl:this.client.fetch
         });
         this.progress('manager-update','installing-update','Launching OpenVST Manager update installer',100);
-        applyAppUpdate({installerPath,platform:this.platform});
-        return {success:true,installerPath};
+        const launched=applyAppUpdate({installerPath,platform:this.platform});
+        return {success:true,launched,installerPath};
       }catch(error){
         await rm(temporary,{recursive:true,force:true}).catch(()=>{});
         throw error;
@@ -184,7 +184,27 @@ export class ManagerService {
       if(this.client.setToken) this.client.setToken(this.settings.githubToken);
       throw error;
     }
-    this.settings=next;return this.getState();
+    const tokenChanged=next.githubToken!==this.settings.githubToken;
+    this.settings=next;
+    if(this.loaded && tokenChanged){
+      return this.refresh();
+    }
+    return this.getState();
+  }
+  async getActivityLog(limit=100){
+    const file=path.join(this.dataDir,'activity.log');
+    const text=await readFile(file,'utf8').catch(error=>{if(error.code==='ENOENT')return '';throw error;});
+    const lines=text.split(/\r?\n/).filter(Boolean);
+    return lines.slice(-Math.max(1,limit)).reverse();
+  }
+  async clearCache(){
+    if(this.busy)throw new Error('Another plugin operation is running. Wait for it to finish.');
+    const cacheDir=this.client?.cacheDir;
+    if(cacheDir)await rm(cacheDir,{recursive:true,force:true}).catch(()=>{});
+    this.releases.clear();
+    this.screenshots.clear();
+    this.loaded=false;
+    return this.refresh();
   }
   selection({id,formats}){
     const plugin=this.catalog.find(p=>p.id===id);
@@ -416,17 +436,29 @@ export class ManagerService {
     const plugins = this.catalog;
     return this.operate('all', async () => {
       this.progress('all', 'removing', 'Removing all installed plugins', 0);
+      const failures = [];
+      let total = 0;
       for (const [index, plugin] of plugins.entries()) {
         const installed = await this.installer.detect(plugin);
         const formats = installed.map(item => item.format);
         if (formats.length) {
-          await this.installer.uninstall({
-            plugin,
-            formats,
-            unmanaged: Boolean(options.unmanaged ?? true),
-          }).catch(() => {});
+          total++;
+          try {
+            await this.installer.uninstall({
+              plugin,
+              formats,
+              unmanaged: Boolean(options.unmanaged ?? true),
+            });
+          } catch (error) {
+            failures.push(`${plugin.name}: ${error.message}`);
+            await this.log(`uninstallAll (${plugin.id}): ${error.message}`).catch(() => {});
+          }
         }
         this.progress('all', 'removing', 'Removing all installed plugins', Math.round(((index + 1) / plugins.length) * 100));
+      }
+      if (failures.length) {
+        const removedOk = total - failures.length;
+        throw new Error(`Removed ${removedOk} of ${total} plugins; ${failures.length} failed (${failures.slice(0, 2).join('; ')}).`);
       }
     });
   }

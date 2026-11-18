@@ -40,9 +40,15 @@ async function readResponseBytes(response, maxBytes, overflowMessage) {
 }
 
 function formatHttpError(response) {
+  if (response.status === 401) {
+    return new Error('GitHub rejected your token (401). Check or clear your GitHub Token in Settings.');
+  }
   if (response.status === 403 || response.status === 429) {
     const reset = Number(response.headers.get('x-ratelimit-reset'));
     return new Error(`GitHub rate limit reached. Try again ${reset ? 'after ' + new Date(reset * 1000).toLocaleTimeString() : 'in a few minutes'}.`);
+  }
+  if (response.status === 404) {
+    return new Error('Plugin resource not found on GitHub (404).');
   }
   return new Error(`GitHub returned ${response.status}. Try refreshing again.`);
 }

@@ -16,6 +16,9 @@ contextBridge.exposeInMainWorld('manager',{
   installAppUpdate:()=>ipcRenderer.invoke('manager:installAppUpdate'),
   openExternal:url=>ipcRenderer.invoke('manager:openExternal',url),
   openFolder:folder=>ipcRenderer.invoke('manager:openFolder',folder),
+  openDataFolder:()=>ipcRenderer.invoke('manager:openDataFolder'),
+  getActivityLog:()=>ipcRenderer.invoke('manager:getActivityLog'),
+  clearCache:()=>ipcRenderer.invoke('manager:clearCache'),
   onProgress:callback=>{
     const listener=(_event,progress)=>callback(progress);
     ipcRenderer.on('manager:progress',listener);
