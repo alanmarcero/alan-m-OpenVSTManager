@@ -233,3 +233,46 @@ test('installAll and updateAll report partial failures accurately', async t => {
   await assert.rejects(() => service.installAll(), /Installed 1 of 2 plugins; 1 failed \(Beta: File in use\)/);
   assert.deepEqual(installedIds, ['openA']);
 });
+
+test('uninstallAll reports partial failures, saveSettings refreshes on token change, and clearCache/getActivityLog work', async t => {
+  const dataDir = await mkdtemp(path.join(tmpdir(), 'openvst-service-log-'));
+  t.after(() => rm(dataDir, { recursive: true, force: true }));
+  const cacheDir = path.join(dataDir, 'cache');
+  await mkdir(cacheDir, { recursive: true });
+  await mkdir(path.join(cacheDir, 'screenshots'), { recursive: true });
+
+  const pluginA = { id: 'openA', repo: 'openA', name: 'Alpha', description: 'A', category: 'FX', bundleNames: { VST3: 'openA.vst3' } };
+  let releaseCalls = 0;
+  const client = {
+    cacheDir,
+    setToken() {},
+    catalog: async () => ({ data: [pluginA], stale: false }),
+    releases: async () => {
+      releaseCalls++;
+      return { data: [], stale: false, fetchedAt: 12345 };
+    },
+  };
+  const installer = {
+    paths: { VST3: '/tmp/plugins' },
+    setPaths() {},
+    detect: async () => [{ format: 'VST3', version: 'v1.0.0', path: '/tmp/plugins/openA.vst3', managed: true }],
+    uninstall: async () => { throw new Error('Locked by DAW'); },
+  };
+  const service = new ManagerService({
+    dataDir, client, installer, platform: 'win32', arch: 'x64',
+    appVersion: '1.4.1', bundledCatalog: [pluginA],
+  });
+
+  await service.getState();
+  assert.equal(releaseCalls, 1);
+
+  await service.saveSettings({ githubToken: 'ghp_new_token' });
+  assert.equal(releaseCalls, 2);
+
+  await assert.rejects(() => service.uninstallAll(), /Removed 0 of 1 plugins; 1 failed \(Alpha: Locked by DAW\)/);
+  const log = await service.getActivityLog();
+  assert.ok(log.some(line => line.includes('uninstallAll (openA): Locked by DAW')));
+
+  await service.clearCache();
+  assert.equal(releaseCalls, 3);
+});

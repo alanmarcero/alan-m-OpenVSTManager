@@ -81,3 +81,8 @@ test('screenshots cache via ETag, update version when bytes change, and reject i
  assert.equal(offline.stale,true);
  assert.deepEqual(offline.data,png2);
 });
+test('401 unauthorized surfaces an actionable GitHub token error',async t=>{
+  const client=await setup(t,async()=>new Response('{}',{status:401}));
+  client.setToken('bad_token');
+  await assert.rejects(()=>client.releases('openMaster'),/token.*401|rejected your token/i);
+});

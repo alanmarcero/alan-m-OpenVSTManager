@@ -4,6 +4,7 @@ import {homedir} from 'node:os';
 import {readFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {parseArgs} from 'node:util';
+import semver from 'semver';
 import {Installer} from '../core/installer.mjs';
 import {GitHubClient} from '../core/github.mjs';
 import {findPlugin} from '../core/releases.mjs';
@@ -13,7 +14,7 @@ const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const {values,positionals}=parseArgs({allowPositionals:true,options:{format:{type:'string',default:'VST3'},version:{type:'string'},'data-dir':{type:'string'},json:{type:'boolean'},help:{type:'boolean'}}});
 const [command='list',id,folder]=positionals;
 if(values.help){
-  console.log('OpenVST Manager\n\nlist [--json]\nrefresh\ninstall <plugin> [--version <tag>] [--format VST3|AU]\ninstall-all\nupdate-all\nuninstall <plugin> [--format VST3|AU]\nuninstall-all\npaths [VST3|AU <folder>] [--json]\n\n--data-dir <folder> uses an isolated settings/receipt directory.');
+  console.log('OpenVST Manager\n\nlist [--json]\ninstalled [--json]\nupdates [--json]\nrefresh [--json]\ninstall <plugin> [--version <tag>] [--format VST3|AU]\ninstall-all\nupdate-all\nuninstall <plugin> [--format VST3|AU]\nuninstall-all\npaths [VST3|AU <folder>] [--json]\n\n--data-dir <folder> uses an isolated settings/receipt directory.');
   process.exit(0);
 }
 const config=process.platform==='darwin'?path.join(homedir(),'Library','Application Support'):process.platform==='win32'?(process.env.APPDATA||path.join(homedir(),'AppData','Roaming')):(process.env.XDG_CONFIG_HOME||path.join(homedir(),'.config'));
@@ -25,11 +26,20 @@ const manager=new ManagerService({dataDir,client:new GitHubClient({cacheDir:path
   onProgress:({message,percent})=>console.error(message+(percent===undefined?'':` ${percent}%`))});
 try{
   const state=command==='refresh'?await manager.refresh():await manager.getState();
-  if(command==='list'||command==='refresh'){
+  if(command==='list'||command==='refresh'||command==='installed'||command==='updates'){
+    const filtered=state.plugins.filter(p=>{
+      if(command==='installed')return p.installed.length>0;
+      if(command==='updates'){
+        const latest=p.releases.find(r=>r.assets.some(a=>a.compatible));
+        const latestVer=latest&&semver.valid(latest.tag);
+        return Boolean(latestVer && p.installed.some(i=>{const cur=semver.valid(i.version);return Boolean(cur && semver.gt(latestVer,cur));}));
+      }
+      return true;
+    });
     if(values.json){
-      console.log(JSON.stringify(state.plugins.map(p=>({id:p.id,name:p.name,latest:p.releases[0]?.tag||null,installed:p.installed})),null,2));
+      console.log(JSON.stringify(filtered.map(p=>({id:p.id,name:p.name,latest:p.releases[0]?.tag||null,installed:p.installed})),null,2));
     }else{
-      for(const p of state.plugins)console.log([p.id,p.releases[0]?.tag||'no release',p.installed.map(i=>`${i.format}:${i.version||'unknown'}${i.managed?'':' (external)'}`).join(', ')||'not installed'].join('\t'));
+      for(const p of filtered)console.log([p.id,p.releases[0]?.tag||'no release',p.installed.map(i=>`${i.format}:${i.version||'unknown'}${i.managed?'':' (external)'}`).join(', ')||'not installed'].join('\t'));
     }
     if(state.offline)console.error('Some GitHub data is unavailable or cached.');
   }else if(command==='paths'){

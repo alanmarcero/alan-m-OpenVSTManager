@@ -111,9 +111,12 @@ export interface ManagerAPI {
   chooseDirectory(format: PluginFormat): Promise<string | null>;
   chooseBackupDirectory?(): Promise<string | null>;
   checkAppUpdate?(): Promise<AppUpdateInfo>;
-  installAppUpdate?(): Promise<{ success: boolean; installerPath?: string }>;
+  installAppUpdate?(): Promise<{ success: boolean; launched?: boolean; installerPath?: string }>;
   openExternal(url: string): Promise<void>;
   openFolder?(folder: string): Promise<void>;
+  openDataFolder?(): Promise<void>;
+  getActivityLog?(): Promise<string[]>;
+  clearCache?(): Promise<ManagerState>;
   onProgress(callback: (progress: Progress) => void): () => void;
 }
 

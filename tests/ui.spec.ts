@@ -62,6 +62,9 @@ const test = base.extend({
         getState: async () => snapshot(), refresh: async () => snapshot(),
         onProgress: () => () => {}, openExternal: async () => {},
         openFolder: async () => {},
+        openDataFolder: async () => {},
+        getActivityLog: async () => ['2026-11-18T16:00:00Z openEDMFilter: complete'],
+        clearCache: async () => snapshot(),
         chooseDirectory: async () => '/tmp/openvst-test/chosen',
         saveSettings: async patch => {
           fixture.state.settings = { ...fixture.state.settings, ...patch, paths: { ...fixture.state.settings.paths, ...patch.paths } };
@@ -296,6 +299,7 @@ test('supports sorting, alias search, keyboard focus, detail release notes, form
   });
   await page.getByRole('button', { name: 'Check for updates', exact: true }).click();
   await page.getByRole('button', { name: /openBassSpace Mastering/ }).click();
+  await expect(page.locator('.version-label')).toContainText('1 KB');
   const detailToggle = page.getByRole('button', { name: 'Release notes for v1.0.0' });
   await detailToggle.click();
   const detailNotes = page.getByRole('region', { name: 'Release notes for version 1.0.0' });
@@ -315,5 +319,9 @@ test('supports sorting, alias search, keyboard focus, detail release notes, form
   await page.locator('#path-VST3').fill('relative/path');
   await expect(page.getByText('Enter an absolute folder path.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Save changes', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'Discard', exact: true }).click();
+  await expect(page.locator('#path-VST3')).toHaveValue('/tmp/openvst-test/VST3');
+  await page.getByRole('button', { name: 'Show recent activity' }).click();
+  await expect(page.getByText(/openEDMFilter: complete/)).toBeVisible();
   await expectSeparatedControls(page);
 });

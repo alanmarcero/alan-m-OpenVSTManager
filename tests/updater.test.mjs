@@ -227,3 +227,16 @@ test('downloadAppUpdate rejects untrusted URLs and unsafe asset filenames', asyn
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test('applyAppUpdate opens dmg on macOS and returns false on Linux', () => {
+  let spawned = null;
+  const mockSpawn = (cmd, args, opts) => {
+    spawned = { cmd, args, opts, unrefed: false };
+    return { unref: () => { spawned.unrefed = true; } };
+  };
+  assert.equal(applyAppUpdate({ installerPath: '/tmp/app.dmg', platform: 'darwin', spawnImpl: mockSpawn }), true);
+  assert.equal(spawned.cmd, 'open');
+  assert.deepEqual(spawned.args, ['/tmp/app.dmg']);
+  assert.equal(spawned.unrefed, true);
+  assert.equal(applyAppUpdate({ installerPath: '/tmp/app.AppImage', platform: 'linux', spawnImpl: mockSpawn }), false);
+});

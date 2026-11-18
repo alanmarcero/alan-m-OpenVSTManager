@@ -469,3 +469,20 @@ test('resolves historical receipts under an alias and migrates receipt', async (
   assert.equal(receipts.installs['new-name:VST3'].pluginId, 'new-name');
   assert.equal(receipts.installs['new-name:VST3'].version, 'v1.0.0');
 });
+
+test('detects unmanaged VST3 versions from moduleinfo.json including 4-part Windows versions', async (t) => {
+  const f = await fixture(t);
+  const installer = new Installer({ dataDir: f.dataDir, paths: f.paths, platform: 'win32', plugins: [plugin] });
+  const resources = path.join(f.paths.VST3, 'Test.vst3', 'Contents', 'Resources');
+  await mkdir(resources, { recursive: true });
+  await writeFile(path.join(resources, 'moduleinfo.json'), JSON.stringify({
+    Name: 'Test',
+    Version: '1.5.0.0',
+    Classes: [{ Name: 'Test', Version: '0.0.0' }],
+  }));
+
+  const detected = await installer.detect(plugin);
+  assert.equal(detected.length, 1);
+  assert.equal(detected[0].managed, false);
+  assert.equal(detected[0].version, 'v1.5.0');
+});

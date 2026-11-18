@@ -170,7 +170,14 @@ export async function downloadAppUpdate({
   if (checksumAsset?.url) {
     try {
       const shaResponse = await fetchWithRedirects(checksumAsset.url, { fetchImpl, timeoutMs: 30_000, appVersion });
-      const shaText = await shaResponse.text();
+      const chunks = [];
+      let shaBytes = 0;
+      for await (const chunk of shaResponse.body) {
+        shaBytes += chunk.length;
+        if (shaBytes > 1024 * 1024) throw new Error('Checksum manifest exceeds size limit.');
+        chunks.push(Buffer.from(chunk));
+      }
+      const shaText = Buffer.concat(chunks).toString('utf8');
       let expectedHash = null;
       for (const line of shaText.split('\n')) {
         const trimmed = line.trim();
@@ -213,6 +220,15 @@ export function applyAppUpdate({
       detached: true,
       stdio: 'ignore',
       windowsHide: false,
+    });
+    child.unref();
+    return true;
+  }
+
+  if (platform === 'darwin') {
+    const child = spawnImpl('open', [installerPath], {
+      detached: true,
+      stdio: 'ignore',
     });
     child.unref();
     return true;
