@@ -1,0 +1,67 @@
+{
+  "openBassSpace": {
+    "tag": "v2.6.1",
+    "excerpt": "restores the plugin factory",
+    "notes": "![Native editor](https://raw.githubusercontent.com/alanmarcero/openBassSpace/5cf5c318117d0ae5027c65a1cc37bcff03404e4c/docs/screenshots/preview.png)\n\n2.6.1 restores the plugin factory. The 2.6.0 suite refactor removed createPluginFilter from PluginProcessor.cpp, so the Windows VST3 link failed with LNK2001.\n\n2.6.0 changes included in this release:\n\n- The editor resizes from 720×520 with no locked aspect ratio. The size is stored in the session.\n- Host bypass crossfades back to the dry input.\n- Factory programs appear in the editor and the host program list.\n- User presets can be saved, renamed, and deleted.\n- Undo and redo.\n- A and B compare, with copy from A to B and B to A.\n\n\n**Full Changelog**: https://github.com/alanmarcero/openBassSpace/compare/v2.6.0...v2.6.1"
+  },
+  "openClapper": {
+    "tag": "v3.11.0",
+    "excerpt": "56 factory claps",
+    "notes": "The DAW program list shows all 56 factory claps in bank order. The editor can be resized and remembers its size. Undo and redo, A/B compare, and user presets are in the editor, and you can drag the current hit out as a WAV.\n\n![openClapper editor](https://raw.githubusercontent.com/alanmarcero/openClapper/e4f19a5a91eb685546c8604a02b5ae5eea5c20cf/docs/screenshots/preview.png)\n\n**Full Changelog**: https://github.com/alanmarcero/openClapper/compare/v3.10.0...v3.11.0\n"
+  },
+  "openDucker": {
+    "tag": "v2.7.1",
+    "excerpt": "behind the duck curve",
+    "notes": "# openDucker 2.7.1\n\nDraws the sidechain, or the main input when no sidechain is connected, behind the duck curve and locks that waveform to the host cycle. Adds 16 factory patches, undo/redo, A/B compare, and user presets saved under Documents/Alan Marcero/openDucker/Presets. The project license is MIT. Tag releases start again: the release workflow grants the build workflow contents write, which GitHub requires before any job runs.\n\n![openDucker native editor](https://raw.githubusercontent.com/alanmarcero/openDucker/21bbda277141e2ceb2561a1a0fa8989cabf2c22f/docs/screenshots/preview.png)\n"
+  },
+  "openEDMDelay": {
+    "tag": "v1.7.0",
+    "excerpt": "sidechain ducking of the echoes",
+    "notes": "Optional sidechain ducking of the echoes, with the sidechain signal drawn behind the duck curve. Undo/redo, A/B compare, and user presets. Relicensed to MIT.\n\n![openEDMDelay editor](https://raw.githubusercontent.com/alanmarcero/openEDMDelay/92857b909d4994c6c20fff81ecf13cb3f6475630/docs/screenshots/preview.png)\n\n**Full Changelog**: https://github.com/alanmarcero/openEDMDelay/compare/v1.6.0...v1.7.0\n"
+  },
+  "openEDMFilter": {
+    "tag": "v1.13.0",
+    "excerpt": "envelope can follow the sidechain",
+    "notes": "The window resizes below 800 px and remembers its size. Each band's envelope can follow the sidechain. Undo/redo, A/B compare, and user presets are included.\n\n![openEDMFilter native editor](https://raw.githubusercontent.com/alanmarcero/openEDMFilter/d5fbcd4a218e4ae5815e635a1504fd09c6e60cc9/docs/screenshots/preview.png)\n\n**Full Changelog**: https://github.com/alanmarcero/openEDMFilter/compare/v1.12.0...v1.13.0\n"
+  },
+  "openEDMKick": {
+    "tag": "v3.9.0",
+    "excerpt": "Drag the last played hit",
+    "notes": "Drag the last played hit out as a WAV, with the kick, drum layers, and the effect tail. An optional sample click layer stays off until you turn it on (Tick, Beater, Wood, Snap, or your own sample, stored in the session). Undo and redo, A/B compare, and user presets are on the editor.\n\n![Native editor](https://raw.githubusercontent.com/alanmarcero/openEDMKick/ccd56353fa66794d8d1c4e05fe9322ecb7e8ef09/docs/screenshots/preview.png)\n\n**Full Changelog**: https://github.com/alanmarcero/openEDMKick/compare/v3.8.0...v3.9.0\n"
+  },
+  "openFruit": {
+    "tag": "v1.9.0",
+    "excerpt": "saved as FLAC",
+    "notes": "Loaded samples are saved as FLAC inside the session, with the original path kept as a hint. Older sessions that only stored paths still open, and the next save embeds the audio. The audio callback no longer takes the engine mutex.\n\nThe editor adds undo and redo for parameter and step edits, two full A/B slots, and a factory plus user preset browser.\n\n![openFruit sequencer](https://raw.githubusercontent.com/alanmarcero/openFruit/664f8e6c860780b6dabe670f65b7a7595ba9f3ea/docs/screenshots/preview.png)\n\n**Full Changelog**: https://github.com/alanmarcero/openFruit/compare/v1.8.1...v1.9.0\n"
+  },
+  "openGlitchFX": {
+    "tag": "v1.8.0",
+    "excerpt": "Club Stutter",
+    "notes": "36 factory patterns are in the editor and the DAW program list. A new plugin opens on Club Stutter.\n\nUndo and redo cover knob moves, pad edits, and randomize.\n\nA/B compare keeps two copies of the sound. User presets save under Documents/Alan Marcero/openGlitchFX/Presets. Factory patterns stay read-only.\n\nThe build targets Audio Unit and Standalone as well as VST3. The macOS job is currently disabled, so this release has no AU or macOS Standalone.\n\n![Editor](https://raw.githubusercontent.com/alanmarcero/openGlitchFX/dc31e2dbd01abe31759bb2fd90cff64ddbdf7159/docs/screenshots/preview.png)\n\n**Full Changelog**: https://github.com/alanmarcero/openGlitchFX/compare/v1.7.1...v1.8.0\n"
+  },
+  "openHatter": {
+    "tag": "v4.7.0",
+    "excerpt": "Resizable editor",
+    "notes": "Resizable editor, undo, A/B compare, user presets, and WAV drag of the locked hat.\n\n![openHatter native editor](https://raw.githubusercontent.com/alanmarcero/openHatter/f676e9ccc484f4800e587e2ce35b05b049ad5305/docs/screenshots/preview.png)\n\n\n**Full Changelog**: https://github.com/alanmarcero/openHatter/compare/v4.6.1...v4.7.0"
+  },
+  "openSausage": {
+    "tag": "v1.10.1",
+    "excerpt": "48 factory recipes",
+    "notes": "48 factory recipes are DAW programs. Rise length can be free or synced to the host tempo at 1, 2, 4, 8, or 16 bars. The editor adds undo/redo, A/B compare, and user presets. The license is MIT.\n\nThe v1.10.0 tag did not publish. Actions rejected the release at startup because the build workflow's preview job requests contents write and the release caller only granted contents read. The caller now grants that permission.\n\n![openSausage editor](https://raw.githubusercontent.com/alanmarcero/openSausage/52576b3c643cc69412bc8d2d2abaf918136fe3ff/docs/screenshots/preview.png)\n\n\n**Full Changelog**: https://github.com/alanmarcero/openSausage/compare/v1.10.0...v1.10.1"
+  },
+  "openSmacker": {
+    "tag": "v2.7.0",
+    "excerpt": "resizes freely",
+    "notes": "- The editor resizes freely, without a locked aspect ratio, and saves its size in the project.\n- Drag WAV exports the locked hit, or renders a fresh one when nothing is locked.\n- Undo and Redo step through parameter edits (Cmd/Ctrl+Z and Shift+Cmd/Ctrl+Z). Loading a preset is one step.\n- A and B keep two copies of the sound. A>B and B>A copy one slot onto the other.\n- User presets can be searched, saved, renamed, deleted, and marked as favorites. Factory presets stay read-only.\n\n![openSmacker native editor](https://raw.githubusercontent.com/alanmarcero/openSmacker/04794e3bb78bdc2390a3e6acedad5c57d6fd6684/docs/screenshots/preview.png)\n\n**Full Changelog**: https://github.com/alanmarcero/openSmacker/compare/v2.6.0...v2.7.0\n"
+  },
+  "openTunerEQ": {
+    "tag": "v1.8.0",
+    "excerpt": "Mid, or Side",
+    "notes": "Each band can sit on Stereo, Left, Right, Mid, or Side. Stereo stays the default, so older sessions sound the same. Eleven factory programs show up in the editor and the DAW list. The editor adds undo/redo, A/B compare, and user presets. The project license is now MIT.\n\n![Native editor](https://raw.githubusercontent.com/alanmarcero/openTunerEQ/731c77759c42e1576723da073467e1829f1733a1/docs/screenshots/preview.png)\n\n**Full Changelog**: https://github.com/alanmarcero/openTunerEQ/compare/v1.7.1...v1.8.0\n"
+  },
+  "openWallLimiter": {
+    "tag": "v1.9.1",
+    "excerpt": "tag build never started",
+    "notes": "# openWallLimiter 1.9.1\n\nThe v1.9.0 tag build never started. The release workflow now allows the build workflow's preview job to request contents write, which GitHub checks before any job starts. The publish job still uses contents write and does not send a commit SHA as the release target.\n\nHost latency at 48 kHz is 9.06 ms (435 samples). That figure includes the limiter delay, the longest oversampling filter, and the 128-sample true-peak guard. Streaming (−14 LUFS) and club (−9 LUFS) targets use the BS.1770 meter. The 48 factory presets are host programs. Undo, redo, A/B compare, and user presets are in the editor. The project license is MIT.\n\n# openWallLimiter 1.9.0\n\nThe editor resizes without a locked aspect ratio and remembers its size. Latency shown to the host includes the oversampling filters and the 128-sample true-peak guard, and the editor prints that delay in milliseconds and samples. Streaming (−14 LUFS) and club (−9 LUFS) loudness targets sit on the BS.1770 meter. The 48 factory presets are host programs. Undo, A/B compare, and saved presets are in the editor. The project license is MIT.\n\n# openWallLimiter 1.8.0\n\nOrganizes 48 factory presets across seven dance music styles (12 Uplifting plus 6 each in Rolling, Progressive, Psy, Tech, Bass & Breaks, and Classic) and updates the editor preset layout.\n\n![openWallLimiter native editor](https://raw.githubusercontent.com/alanmarcero/openWallLimiter/1f9732ee60b3ecaacecc85cdd38d8c9ac161adc5/docs/screenshots/preview.png)\n\n# openWallLimiter 1.7.1\n\nSkips idle oversampling FIR passes when oversampling is inactive and repaints meters using dirty rects for lower CPU usage.\n\n# openWallLimiter 1.7.0\n\nAdds Pre-Limiter Input Drive, Stereo Width, and Spectral Tilt controls with standardized suite UI layout and an updated native editor screenshot.\n\n# openWallLimiter 1.6.0\n\nThe new fortress emblem follows host quarter notes. Larger controls, a clearer Link levels switch and dark tooltips make the limiter easier to operate while watching the meters.\n\n![openWallLimiter native editor](https://raw.githubusercontent.com/alanmarcero/openWallLimiter/v1.6.0/docs/screenshots/openWallLimiter.png)\n\n# openWallLimiter 1.5.1\n\n- Updated the editor with the suite's graphite, mint, and amber palette.\n- Enlarged controls and clarified preset navigation and button labels for easier use.\n- Rebalanced the native editor and refreshed its screenshot.\n\n# openWallLimiter 1.5.0\n\n- Added adjustable 0–5 ms lookahead without changing the fixed host latency.\n- Renamed Stereo Link to Transient Link while retaining its automation ID and behavior.\n- Added independent Release Link control for stereo recovery envelopes.\n- Older sessions load with 5 ms lookahead and independent release envelopes.\n- Added slider, DSP, state migration, and native editor screenshot checks.\n\n# openWallLimiter 1.1.4\n\nSubstantial sound quality improvements across all five limiter algorithms:\n\n- **Eliminated sub-bass harmonic and intermodulation distortion**: Expanded minimum hold windows across all modes (18–26 ms) to fully bridge sub-bass half-cycles down to 25–30 Hz. THD at 30 Hz dropped from -27 dB (over 4% distortion in Aggressive) to -164.6 dB, and IMD at 40 Hz dropped from -31.9 dB to -145.1 dB.\n- **Envelope corner rounding on all modes**: Enabled smooth one-pole release rounding across Modern, Aggressive, Classic, Smooth, and Safe modes, preventing gain-recovery slope kinks and spectral splatter.\n- **Punchy and musical transient recovery**: Re-tuned attack and dual-stage release profiles (Modern: 2.2 ms attack, 40/260 ms release; Aggressive: 1.2 ms attack, 22/130 ms release; Classic: 1.8 ms attack, 30/240 ms opto-style release) for maximum punch and loudness without pumping.\n- **Musical clip knee tuning**: Re-calibrated transient clipping allowance (1.0–2.5 dB) so soft-saturation only gently rounds peak crests without muddying the body of the mix.\n\n# openWallLimiter 1.1.3\n\nWording only. Limiter behavior is unchanged.\n\n- Mode tips state the attack, hold, release, and clip behavior. The panel no longer uses the fortress slogans. Ceiling still reads Maximum output.\n- The README describes the limiter, the pre-limiter filters, and true-peak protection directly.\n\n# openWallLimiter 1.1.2\n\nA fix for lost treble at 44.1 kHz.\n\n- With oversampling on at 44.1 kHz, the output lost treble even with no limiting: -2.4 dB at 10 kHz, -6.3 dB at 15 kHz and -10.9 dB at 18 kHz. The lookahead came to a half sample at the base rate, and the delay that aligns it averaged two samples. The lookahead now rounds up to a whole number of samples at every oversampling factor, and the response is flat. 48 kHz sessions were not affected.\n\nPackages include macOS universal VST3/AU and Windows x64 VST3. macOS bundles are ad-hoc signed, not notarized.\n"
+  }
+}

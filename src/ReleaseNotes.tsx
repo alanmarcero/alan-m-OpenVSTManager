@@ -1,52 +1,7 @@
 import { Fragment, type ReactNode } from 'react';
+import { cleanReleaseNoteLines } from './releaseNoteText';
 
-const stripInlineMarkdown = (text: string) =>
-  text
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1')
-    .replace(/`([^`]+)`/g, '$1')
-    .replace(/\*\*([^*]+)\*\*/g, '$1')
-    .replace(/\*([^*]+)\*/g, '$1')
-    .trim();
-
-function cleanReleaseNoteLines(notes: string): string[] {
-  const withoutComments = (notes || '').replace(/<!--[\s\S]*?-->/g, '');
-  const lines = withoutComments
-    .split(/\r?\n/)
-    .map(line =>
-      line
-        .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
-        .replace(/^\s*>\s?/, '')
-        .replace(/\s+in\s+https:\/\/github\.com\/[^/\s]+\/[^/\s]+\/pull\/(\d+)\b/gi, ' (#$1)')
-        .trimEnd()
-    )
-    .filter(line => !/^\s*\*\*Full Changelog\*\*:\s*https?:\/\//i.test(line));
-
-  while (lines.length && !lines[0].trim()) lines.shift();
-  if (lines.length && /^#\s+\S/.test(lines[0])) {
-    lines.shift();
-    while (lines.length && !lines[0].trim()) lines.shift();
-  }
-  while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
-  return lines;
-}
-
-export function summarizeReleaseNotes(notes: string): string {
-  const lines = cleanReleaseNoteLines(notes);
-  const parts: string[] = [];
-  for (const raw of lines) {
-    const trimmed = raw.trim();
-    if (!trimmed || /^#{1,6}\s+/.test(trimmed) || /^([-*_])\1{2,}$/.test(trimmed)) continue;
-    const text = stripInlineMarkdown(trimmed.replace(/^(?:[-*]|\d+\.)\s+/, ''));
-    if (text) parts.push(text);
-    if (parts.join(' ').length >= 160) break;
-  }
-  return parts.join(' ').replace(/\s+/g, ' ').trim();
-}
-
-export function hasReleaseNotesContent(notes: string): boolean {
-  return cleanReleaseNoteLines(notes).length > 0;
-}
+export { hasReleaseNotesContent, releaseNoteTargets, summarizeReleaseNotes } from './releaseNoteText';
 
 function renderInline(text: string): ReactNode[] {
   const nodes: ReactNode[] = [];
@@ -80,7 +35,7 @@ function renderInline(text: string): ReactNode[] {
 export function ReleaseNotesBody({ notes }: { notes: string }) {
   const lines = cleanReleaseNoteLines(notes);
   if (!lines.length) {
-    return <p className="release-notes-empty">Updated release notes are available on GitHub.</p>;
+    return <p className="release-notes-empty">No release notes for this version.</p>;
   }
 
   const blocks: ReactNode[] = [];

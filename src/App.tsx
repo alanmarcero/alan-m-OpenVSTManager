@@ -7,7 +7,7 @@ import {
   Sparkles, Sun, Trash2, WifiOff, X, Zap,
 } from 'lucide-react';
 import { BrandMark, PluginGlyph } from './pluginIcons';
-import { hasReleaseNotesContent, ReleaseNotesBody, summarizeReleaseNotes } from './ReleaseNotes';
+import { hasReleaseNotesContent, ReleaseNotesBody, releaseNoteTargets, summarizeReleaseNotes } from './ReleaseNotes';
 import type { AppUpdateInfo, InstalledPlugin, ManagerAPI, ManagerState, PathOption, Plugin, PluginFormat, PluginRelease, Progress, Settings } from './types';
 
 type View = 'library' | 'installed' | 'updates' | 'settings';
@@ -16,6 +16,7 @@ type Busy = { id: string; action: string } | null;
 type Notice = { message: string; kind: 'error' | 'success' } | null;
 type Theme = 'light' | 'dark' | 'cyberpunk';
 const formatVersion = (tag: string) => tag.replace(/^v(?=\d)/, '');
+const bundledScreenshotSrc = (repo: string) => `./bundled-screenshots/${encodeURIComponent(repo)}.png`;
 const errorMessage = (error: unknown) => error instanceof Error ? error.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : String(error);
 const platformName = (platform: string) => ({ darwin: 'macOS', win32: 'Windows', linux: 'Linux' })[platform] || platform;
 const formatBytes = (bytes: number) => {
@@ -205,10 +206,10 @@ export function App() {
   const selected = sortedVisible.find(plugin => plugin.id === selectedId) ?? sortedVisible[0];
   const showRowNotes = view === 'updates' || view === 'installed';
   const updatesWithNotes = showRowNotes
-    ? sortedVisible.filter(plugin => {
-        const latest = latestAvailableRelease(plugin) ?? plugin.releases[0];
-        return Boolean(latest && (summarizeReleaseNotes(latest.notes) || hasReleaseNotesContent(latest.notes)));
-      })
+    ? sortedVisible.filter(plugin => releaseNoteTargets({
+        releases: plugin.releases,
+        installedVersions: plugin.installed.map(item => item.version),
+      }).some(target => hasReleaseNotesContent(target.notes)))
     : [];
   const allNotesExpanded = updatesWithNotes.length > 0 && updatesWithNotes.every(plugin => Boolean(expandedNotes[plugin.id]));
   const categories = [...new Set(plugins.map(plugin => plugin.category))].sort();
@@ -410,9 +411,18 @@ function PluginRow({ plugin, selected, busy, progress, showUpdateNotes = false, 
   const latestRelease = latestAvailableRelease(plugin);
   const release = latestRelease ?? plugin.releases[0];
   const notesRelease = release;
-  const rawSummary = showUpdateNotes && notesRelease ? summarizeReleaseNotes(notesRelease.notes) : '';
-  const updateSummary = rawSummary || (showUpdateNotes && notesRelease && hasReleaseNotesContent(notesRelease.notes) ? `Version ${formatVersion(notesRelease.tag)} release notes` : '');
-  const hasNotes = Boolean(showUpdateNotes && notesRelease && (rawSummary || hasReleaseNotesContent(notesRelease.notes)));
+  const noteTargets = releaseNoteTargets({
+    releases: plugin.releases,
+    installedVersions: plugin.installed.map(item => item.version),
+    selectedTag: notesRelease?.tag,
+  }).filter(target => hasReleaseNotesContent(target.notes));
+  const summaryNotes = notesRelease && hasReleaseNotesContent(notesRelease.notes)
+    ? notesRelease.notes
+    : (noteTargets[0]?.notes ?? '');
+  const rawSummary = showUpdateNotes ? summarizeReleaseNotes(summaryNotes) : '';
+  const summaryTag = notesRelease && hasReleaseNotesContent(notesRelease.notes) ? notesRelease.tag : noteTargets[0]?.tag;
+  const updateSummary = rawSummary || (showUpdateNotes && summaryNotes ? `Version ${formatVersion(summaryTag || '')} release notes` : '');
+  const hasNotes = Boolean(showUpdateNotes && noteTargets.length);
   const installedVersions = showUpdateNotes && update && latestRelease
     ? [...new Set(plugin.installed.filter(item => needsUpdate(item, latestRelease)).map(item => item.version).filter(Boolean).map(value => formatVersion(value!)))]
     : [];
@@ -444,8 +454,13 @@ function PluginRow({ plugin, selected, busy, progress, showUpdateNotes = false, 
       <ChevronDown size={13} className={notesOpen ? 'notes-toggle-open' : ''} aria-hidden="true" />
       <span>{notesOpen ? 'Hide full notes' : 'Show full notes'}</span>
     </button>
-    {notesOpen && <div id={notesId} className="plugin-row-notes-body" role="region" aria-label={`Full release notes for ${plugin.name} ${formatVersion(notesRelease.tag)}`}>
-      <ReleaseNotesBody notes={notesRelease.notes} />
+    {notesOpen && <div id={notesId} className="plugin-row-notes-body" role="region" aria-label={`Full release notes for ${plugin.name} ${formatVersion(notesRelease?.tag || noteTargets[0]?.tag || '')}`}>
+      {noteTargets.map(target => (
+        <div key={`${target.role}-${target.tag}`}>
+          {noteTargets.length > 1 && <p className="row-notes-kicker">{target.role === 'installed' ? `Installed v${formatVersion(target.tag)}` : `v${formatVersion(target.tag)}`}</p>}
+          <ReleaseNotesBody notes={target.notes} />
+        </div>
+      ))}
     </div>}
   </div>}
   </>;
@@ -462,7 +477,6 @@ function PluginDetail({ plugin, state, busy, progress, openExternal, onOpenFolde
 }) {
   const latestPreferredTag = (latestAvailableRelease(plugin) ?? plugin.releases[0])?.tag ?? '';
   const [tag, setTag] = useState(latestPreferredTag);
-  const [showSelectedNotes, setShowSelectedNotes] = useState(false);
   const [formats, setFormats] = useState<PluginFormat[]>(() => {
     const detected = plugin.installed.map(item => item.format);
     if (detected.length) return [...new Set(detected)];
@@ -473,11 +487,14 @@ function PluginDetail({ plugin, state, busy, progress, openExternal, onOpenFolde
   });
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [confirmReplace, setConfirmReplace] = useState(false);
-  const [imageFailed, setImageFailed] = useState(false);
   const [showScreenshotModal, setShowScreenshotModal] = useState(false);
+  const bundledScreenshot = bundledScreenshotSrc(plugin.repo);
+  const [shotSrc, setShotSrc] = useState(plugin.screenshotUrl || bundledScreenshot);
+  const [imageFailed, setImageFailed] = useState(false);
   useEffect(() => {
+    setShotSrc(plugin.screenshotUrl || bundledScreenshot);
     setImageFailed(false);
-  }, [plugin.screenshotUrl]);
+  }, [plugin.screenshotUrl, bundledScreenshot]);
   const prevPreferredRef = useRef(latestPreferredTag);
   useEffect(() => {
     if (prevPreferredRef.current !== latestPreferredTag) {
@@ -490,6 +507,11 @@ function PluginDetail({ plugin, state, busy, progress, openExternal, onOpenFolde
   const updateRelease = latestAvailableRelease(plugin);
   const pluginHasUpdate = hasUpdate(plugin);
   const release = plugin.releases.find(item => item.tag === tag) ?? plugin.releases[0];
+  const noteTargets = releaseNoteTargets({
+    releases: plugin.releases,
+    installedVersions: plugin.installed.map(item => item.version),
+    selectedTag: release?.tag,
+  });
 
   const managed = plugin.installed.filter(item => item.managed);
   const unmanaged = plugin.installed.filter(item => !item.managed);
@@ -552,7 +574,7 @@ function PluginDetail({ plugin, state, busy, progress, openExternal, onOpenFolde
     <h2>{plugin.name}</h2>
     <p className="plugin-description">{plugin.description}</p>
     {plugin.notice && <p className="plugin-notice">{plugin.notice}</p>}
-    {plugin.screenshotUrl && !imageFailed && (
+    {shotSrc && !imageFailed && (
       <div className="plugin-screenshot-card">
         <button
           type="button"
@@ -562,9 +584,15 @@ function PluginDetail({ plugin, state, busy, progress, openExternal, onOpenFolde
         >
           <img
             className="plugin-screenshot"
-            src={plugin.screenshotUrl}
+            src={shotSrc}
             alt={`${plugin.name} interface preview`}
-            onError={() => setImageFailed(true)}
+            onError={() => {
+              if (shotSrc !== bundledScreenshot) {
+                setShotSrc(bundledScreenshot);
+                return;
+              }
+              setImageFailed(true);
+            }}
           />
           <span className="screenshot-zoom-hint" aria-hidden="true"><Maximize2 size={12} />Preview</span>
         </button>
@@ -572,30 +600,29 @@ function PluginDetail({ plugin, state, busy, progress, openExternal, onOpenFolde
     )}
     <div className="detail-divider" />
     {plugin.error && <p className="inline-error"><CircleAlert size={15} />{plugin.error}</p>}
-    {pluginHasUpdate && updateRelease && (
-      <section className="plugin-update-notes" aria-label={`Release notes for version ${formatVersion(updateRelease.tag)}`}>
-        <div className="plugin-update-notes-header">
-          <span className="status-dot" aria-hidden="true" />
-          <span>What’s new in v{formatVersion(updateRelease.tag)}</span>
-        </div>
-        <ReleaseNotesBody notes={updateRelease.notes} />
-      </section>
-    )}
+    {noteTargets.map(target => {
+      const version = formatVersion(target.tag);
+      const isWhatsNew = target.role === 'latest' && pluginHasUpdate && Boolean(updateRelease) && formatVersion(updateRelease!.tag) === version;
+      const title = target.role === 'installed'
+        ? `Installed v${version}`
+        : isWhatsNew
+          ? `What’s new in v${version}`
+          : `Release notes for v${version}`;
+      const label = target.role === 'installed'
+        ? `Installed release notes for version ${version}`
+        : `Release notes for version ${version}`;
+      return (
+        <section key={`${target.role}-${target.tag}`} className="plugin-update-notes" aria-label={label}>
+          <div className="plugin-update-notes-header">
+            {isWhatsNew && <span className="status-dot" aria-hidden="true" />}
+            <span>{title}</span>
+          </div>
+          <ReleaseNotesBody notes={target.notes} />
+        </section>
+      );
+    })}
     <div className="version-label"><label htmlFor={`release-${plugin.id}`}>Release</label>{releaseMeta && <span>{releaseMeta}</span>}</div>
     <div className="release-select"><select id={`release-${plugin.id}`} value={release?.tag ?? ''} onChange={event => setTag(event.target.value)} disabled={!plugin.releases.length || Boolean(busy)}>{plugin.releases.length ? plugin.releases.map((item, index) => <option key={item.tag} value={item.tag}>Version {formatVersion(item.tag)}{item.prerelease ? ' (pre-release)' : index === 0 ? ' (latest)' : ''}</option>) : <option value="">No releases yet</option>}</select><ChevronDown size={15} /></div>
-    {release && hasReleaseNotesContent(release.notes) && (!pluginHasUpdate || release.tag !== updateRelease?.tag) && (
-      <div className="detail-release-notes-wrap">
-        <button type="button" className="notes-toggle detail-notes-toggle" aria-expanded={showSelectedNotes} onClick={() => setShowSelectedNotes(open => !open)}>
-          <ChevronDown size={13} className={showSelectedNotes ? 'notes-toggle-open' : ''} aria-hidden="true" />
-          <span>{showSelectedNotes ? 'Hide release notes' : `Release notes for v${formatVersion(release.tag)}`}</span>
-        </button>
-        {showSelectedNotes && (
-          <section className="plugin-update-notes detail-release-notes" aria-label={`Release notes for version ${formatVersion(release.tag)}`}>
-            <ReleaseNotesBody notes={release.notes} />
-          </section>
-        )}
-      </div>
-    )}
     <fieldset className="format-fieldset" disabled={Boolean(busy) || !available}><legend>Plugin formats</legend><div className="format-options">{plugin.formats.map(format => <label className={`format-option ${formats.includes(format) ? 'checked' : ''}`} key={format}><input type="checkbox" checked={formats.includes(format)} onChange={() => toggleFormat(format)} /><span className="checkbox-mark">{formats.includes(format) && <Check size={11} strokeWidth={2.4} />}</span><span>{format}</span></label>)}</div>{available && formats.length === 0 && <p className="inline-hint">Select at least one format above to continue.</p>}</fieldset>
     {available ? (
       <div className="install-actions">
@@ -627,7 +654,7 @@ function PluginDetail({ plugin, state, busy, progress, openExternal, onOpenFolde
     <div className="detail-links"><button onClick={() => void openExternal(plugin.url)}><Github size={14} /><span>View project</span><ArrowUpRight size={13} /></button>{release && <button onClick={() => void openExternal(release.url)}><ExternalLink size={14} /><span>Release notes</span><ArrowUpRight size={13} /></button>}</div>
     {confirmRemove && <ConfirmDialog title={`Remove ${plugin.name}?`} description={`This removes ${plugin.name} (${plugin.installed.map(item => item.format).join(' and ')}) from your computer.`} cancelLabel="Keep plugin" actionLabel="Remove plugin" danger={true} busy={Boolean(busy)} onCancel={() => setConfirmRemove(false)} onConfirm={async () => { if (await uninstall(plugin.installed.map(item => item.format), { unmanaged: true })) setConfirmRemove(false); }} />}
     {confirmReplace && <ConfirmDialog title={`Replace existing ${plugin.name}?`} description={`An unmanaged ${formats.join(', ')} plugin already exists in your installation folder. OpenVST Manager will replace it with version ${formatVersion(release?.tag ?? '')} and manage it.`} cancelLabel="Keep existing" actionLabel="Replace and install" danger={false} busy={Boolean(busy)} onCancel={() => setConfirmReplace(false)} onConfirm={async () => { if (release && await install(release.tag, formats, { overwrite: true })) setConfirmReplace(false); }} />}
-    {showScreenshotModal && plugin.screenshotUrl && <ScreenshotDialog name={plugin.name} src={plugin.screenshotUrl} onClose={() => setShowScreenshotModal(false)} />}
+    {showScreenshotModal && shotSrc && !imageFailed && <ScreenshotDialog name={plugin.name} src={shotSrc} onClose={() => setShowScreenshotModal(false)} />}
   </aside>;
 }
 

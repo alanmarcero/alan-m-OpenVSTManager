@@ -164,10 +164,13 @@ svg { flex-shrink: 0; }
 .notes-toggle svg { transition: transform 120ms ease; }
 .notes-toggle svg.notes-toggle-open { transform: rotate(180deg); }
 .plugin-row-notes-body { margin-top: 6px; padding: 10px 12px; border-radius: 7px; background: #e3ecee; border: 1px solid #cddce0; }
+.row-notes-kicker { margin: 8px 0 4px; font-size: 10px; font-weight: 650; color: #366a71; }
+.row-notes-kicker:first-child { margin-top: 0; }
 :is([data-theme="dark"], [data-theme="cyberpunk"]) .plugin-row-notes { border-bottom-color: var(--line); }
 :is([data-theme="dark"], [data-theme="cyberpunk"]) .notes-toggle { color: #8fd2dc; }
 :is([data-theme="dark"], [data-theme="cyberpunk"]) .notes-toggle:hover { background: var(--theme-panel); }
 :is([data-theme="dark"], [data-theme="cyberpunk"]) .plugin-row-notes-body { background: #172b35; border-color: #294a56; }
+:is([data-theme="dark"], [data-theme="cyberpunk"]) .row-notes-kicker { color: #8fd2dc; }
 [data-theme="cyberpunk"] .plugin-row-notes-body { background: #16223a; border-color: #3a4a73; }
 .screenshot-dialog { max-width: min(960px, calc(100vw - 48px)); width: auto; overscroll-behavior: contain; }
 .screenshot-dialog-content { padding: 18px 20px 20px; }

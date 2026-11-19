@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,rm} from 'node:fs/promises';
+import {mkdtemp,rm,writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {GitHubClient} from '../core/github.mjs';
@@ -85,6 +85,63 @@ test('401 unauthorized surfaces an actionable GitHub token error',async t=>{
   const client=await setup(t,async()=>new Response('{}',{status:401}));
   client.setToken('bad_token');
   await assert.rejects(()=>client.releases('openMaster'),/token.*401|rejected your token/i);
+});
+test('rate limits keep the cached release notes',async t=>{
+ let limited=false;
+ const client=await setup(t,async()=>limited
+  ? new Response('{}',{status:403,headers:{'x-ratelimit-remaining':'0','x-ratelimit-reset':'1790000000'}})
+  : new Response(JSON.stringify([{tag_name:'v2.7.1',body:'Draws the sidechain.'}])));
+ assert.equal((await client.releases('openDucker')).data[0].body,'Draws the sidechain.');
+ limited=true;
+ const cached=await client.releases('openDucker',{force:true});
+ assert.equal(cached.stale,true);
+ assert.match(cached.error,/rate limit/i);
+ assert.equal(cached.data[0].body,'Draws the sidechain.');
+});
+test('offline screenshots use the bundled image, while a live image replaces it',async t=>{
+ const bundled=await mkdtemp(path.join(tmpdir(),'openvst-bundled-'));
+ t.after(()=>rm(bundled,{recursive:true,force:true}));
+ const bundledPng=Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a,0x11]);
+ const livePng=Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a,0x22]);
+ await writeFile(path.join(bundled,'openDucker.png'),bundledPng);
+ let mode='offline';
+ const client=await setup(t,async url=>{
+  assert.equal(url,'https://raw.githubusercontent.com/alanmarcero/openDucker/main/docs/screenshots/preview.png');
+  if(mode==='offline')throw new Error('network down');
+  if(mode==='limited')return new Response('{}',{status:403,headers:{'x-ratelimit-remaining':'0','x-ratelimit-reset':'1790000000'}});
+  return new Response(livePng,{headers:{etag:'"live"'}});
+ });
+ client.bundledScreenshotsDir=bundled;
+ const fallback=await client.screenshot('openDucker');
+ assert.equal(fallback.bundled,true);
+ assert.equal(fallback.stale,true);
+ assert.match(fallback.error,/network down/);
+ assert.deepEqual(fallback.data,bundledPng);
+ mode='live';
+ const live=await client.screenshot('openDucker',{force:true});
+ assert.equal(live.stale,false);
+ assert.equal(live.bundled,undefined);
+ assert.deepEqual(live.data,livePng);
+ mode='limited';
+ const cached=await client.screenshot('openDucker',{force:true});
+ assert.equal(cached.stale,true);
+ assert.match(cached.error,/rate limit/i);
+ assert.deepEqual(cached.data,livePng);
+});
+test('a rate-limited screenshot with no cache still shows the bundled image',async t=>{
+ const bundled=await mkdtemp(path.join(tmpdir(),'openvst-bundled-'));
+ t.after(()=>rm(bundled,{recursive:true,force:true}));
+ const bundledPng=Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a,0x33]);
+ await writeFile(path.join(bundled,'openHatter.png'),bundledPng);
+ await writeFile(path.join(bundled,'openClapper.png'),Buffer.from('not an image'));
+ const client=await setup(t,async()=>new Response('{}',{status:403,headers:{'x-ratelimit-remaining':'0'}}));
+ client.bundledScreenshotsDir=bundled;
+ const shot=await client.screenshot('openHatter',{includeData:false});
+ assert.equal(shot.bundled,true);
+ assert.equal(shot.data,undefined);
+ assert.match(shot.version,/^[a-f0-9]{12}$/);
+ assert.match(shot.error,/rate limit/i);
+ await assert.rejects(()=>client.screenshot('openClapper'),/rate limit/i);
 });
 test('Content-Length pre-check rejects oversized responses before reading body and 403 distinguishes access denied from rate limit',async t=>{
   let bodyRead=false;

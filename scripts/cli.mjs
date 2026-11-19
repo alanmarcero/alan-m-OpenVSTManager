@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import path from 'node:path';
 import {homedir} from 'node:os';
+import {existsSync} from 'node:fs';
 import {readFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {parseArgs} from 'node:util';
@@ -21,7 +22,9 @@ const config=process.platform==='darwin'?path.join(homedir(),'Library','Applicat
 const dataDir=path.resolve(values['data-dir']||process.env.OPENVST_DATA_DIR||path.join(config,'OpenVST Manager'));
 const bundledCatalog=JSON.parse(await readFile(path.join(root,'catalog.json'),'utf8'));
 const appVersion=JSON.parse(await readFile(path.join(root,'package.json'),'utf8')).version;
-const manager=new ManagerService({dataDir,client:new GitHubClient({cacheDir:path.join(dataDir,'cache'),appVersion}),installer:new Installer({dataDir,plugins:bundledCatalog}),
+const sourceShots=path.join(root,'public','bundled-screenshots');
+const builtShots=path.join(root,'dist','bundled-screenshots');
+const manager=new ManagerService({dataDir,client:new GitHubClient({cacheDir:path.join(dataDir,'cache'),appVersion,bundledScreenshotsDir:existsSync(sourceShots)?sourceShots:builtShots}),installer:new Installer({dataDir,plugins:bundledCatalog}),
   appVersion,
   bundledCatalog,
   onProgress:({message,percent})=>console.error(message+(percent===undefined?'':` ${percent}%`))});

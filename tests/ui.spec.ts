@@ -1,5 +1,6 @@
 import { test as base, expect, type Page } from '@playwright/test';
 import catalog from '../catalog.json' with { type: 'json' };
+import todayNotes from './fixtures/today-release-notes.json' with { type: 'json' };
 import type { ManagerState, PluginFormat } from '../src/types';
 
 interface RecordedOperation {
@@ -331,9 +332,8 @@ test('supports sorting, alias search, keyboard focus, detail release notes, form
   await page.getByRole('button', { name: /openBassSpace Mastering/ }).click();
   await expect(page.locator('.version-label')).toContainText('Pre-release ·');
   await expect(page.locator('#release-openBassSpace')).toContainText('(pre-release)');
-  const detailToggle = page.getByRole('button', { name: 'Release notes for v1.0.0' });
-  await detailToggle.click();
   const detailNotes = page.getByRole('region', { name: 'Release notes for version 1.0.0' });
+  await expect(detailNotes).toBeVisible();
   await expect(detailNotes.locator('ol li')).toHaveCount(2);
   await expect(detailNotes).toContainText('Important note');
   await expect(detailNotes).toContainText('(#12)');
@@ -391,4 +391,69 @@ test('supports sorting, alias search, keyboard focus, detail release notes, form
   await expect(page.locator('.plugin-row .plugin-update-summary')).toContainText('Adds analog drive curves and LFO sync refinements.');
   await page.getByRole('button', { name: 'Show full notes' }).click();
   await expect(page.getByRole('region', { name: /Full release notes for openEDMFilter 1\.0\.0/ })).toContainText('Improved filter envelope tracking.');
+});
+
+const notesByPlugin = todayNotes as Record<string, { tag: string; excerpt: string; notes: string }>;
+
+test('shows today’s release notes for every plugin, installed notes beside the latest, and a bundled screenshot when the live image fails', async ({ page }) => {
+  await page.evaluate(notes => {
+    for (const plugin of window.__managerTest.state.plugins) {
+      const entry = notes[plugin.id];
+      if (!entry) {
+        plugin.releases[0].notes = '';
+        continue;
+      }
+      plugin.releases[0].tag = entry.tag;
+      plugin.releases[0].name = entry.tag;
+      plugin.releases[0].notes = entry.notes;
+    }
+    const filter = window.__managerTest.state.plugins.find(item => item.id === 'openEDMFilter')!;
+    const latest = filter.releases[0];
+    filter.releases = [
+      latest,
+      { ...latest, tag: 'v1.12.0', name: 'v1.12.0', notes: 'Older filter release kept its envelope notes.' },
+    ];
+    filter.installed = [{ format: 'VST3', version: 'v1.12.0', path: '/tmp/filter.vst3', managed: true }];
+    const sausage = window.__managerTest.state.plugins.find(item => item.id === 'openSausage')!;
+    sausage.releases[0].notes += '\n\n<script>alert(1)</script> <img src=x onerror=alert(1)> **safe bold**';
+  }, notesByPlugin);
+  await page.getByRole('button', { name: 'Check for updates', exact: true }).click();
+
+  for (const plugin of catalog) {
+    await page.getByRole('button', { name: new RegExp(`^${plugin.name}\\s+${plugin.category}`) }).click();
+    const entry = notesByPlugin[plugin.id];
+    if (!entry) {
+      await expect(page.getByRole('region', { name: /Release notes for version/ })).toContainText('No release notes for this version.');
+      continue;
+    }
+    const version = entry.tag.replace(/^v/, '');
+    await expect(page.getByRole('region', { name: `Release notes for version ${version}` })).toContainText(entry.excerpt);
+  }
+
+  await page.getByRole('button', { name: /^openEDMFilter\s+Filter/ }).click();
+  await expect(page.getByRole('region', { name: 'Installed release notes for version 1.12.0' })).toContainText('Older filter release kept its envelope notes.');
+  await expect(page.getByRole('region', { name: 'Release notes for version 1.13.0' })).toContainText('envelope can follow the sidechain');
+
+  await page.getByRole('button', { name: /^openSausage\s+Creative/ }).click();
+  const sausageNotes = page.getByRole('region', { name: 'Release notes for version 1.10.1' });
+  await expect(sausageNotes).toContainText('<script>alert(1)</script>');
+  await expect(sausageNotes.locator('script, img')).toHaveCount(0);
+  await expect(sausageNotes.locator('strong')).toHaveText('safe bold');
+  await page.evaluate(() => {
+    window.__managerTest.state.error = 'GitHub rate limit reached. Try again after 1:00 AM.';
+    window.__managerTest.state.offline = false;
+  });
+  await page.getByRole('button', { name: 'Check for updates', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'GitHub rate limit reached.' })).toBeVisible();
+  await expect(sausageNotes).toContainText('48 factory recipes');
+
+  await page.evaluate(() => {
+    const plugin = window.__managerTest.state.plugins.find(item => item.id === 'openDucker')!;
+    plugin.screenshotUrl = './bundled-screenshots/missing-live.png';
+  });
+  await page.getByRole('button', { name: 'Check for updates', exact: true }).click();
+  await page.getByRole('button', { name: /^openDucker\s+Dynamics/ }).click();
+  const preview = page.getByRole('button', { name: 'Enlarge openDucker screenshot' }).locator('img');
+  await expect(preview).toHaveAttribute('src', './bundled-screenshots/openDucker.png');
+  await expect(preview).toBeVisible();
 });
