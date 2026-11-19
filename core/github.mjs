@@ -70,11 +70,12 @@ function formatHttpError(response, { hasToken = false } = {}) {
 }
 
 export class GitHubClient {
-  constructor({cacheDir,fetchImpl=fetch,token=null,appVersion='1.4.0'}={}) {
+  constructor({cacheDir,fetchImpl=fetch,token=null,appVersion='1.4.0',bundledScreenshotsDir=null}={}) {
     this.cacheDir=cacheDir;
     this.fetch=fetchImpl;
     this.token=token ? String(token).trim() : null;
     this.appVersion=appVersion;
+    this.bundledScreenshotsDir=bundledScreenshotsDir ? path.resolve(bundledScreenshotsDir) : null;
   }
   setToken(token) {
     this.token = token ? String(token).trim() : null;
@@ -145,8 +146,24 @@ export class GitHubClient {
       return {contentType,version,fetchedAt,stale:false,...(includeData?{data}:{})};
     } catch(error) {
       if(cachedValid) return {contentType:cachedMeta.contentType,version:cachedMeta.version,fetchedAt:cachedMeta.fetchedAt,stale:true,error:error.message,...(Number.isInteger(error?.httpStatus)?{httpStatus:error.httpStatus}:{}),...(includeData?{data:cachedBuffer}:{})};
+      const bundled=await this.readBundledScreenshot(repo);
+      if(bundled) {
+        const version=createHash('sha256').update(bundled.data).digest('hex').slice(0,12);
+        return {contentType:bundled.contentType,version,fetchedAt:Date.now(),stale:true,bundled:true,error:error.message,...(Number.isInteger(error?.httpStatus)?{httpStatus:error.httpStatus}:{}),...(includeData?{data:bundled.data}:{})};
+      }
       throw error;
     }
+  }
+  async readBundledScreenshot(repo) {
+    if(!this.bundledScreenshotsDir) return null;
+    assertValidRepo(repo);
+    const root=`${this.bundledScreenshotsDir}${path.sep}`;
+    const file=path.resolve(this.bundledScreenshotsDir,`${repo}.png`);
+    if(!file.startsWith(root)) return null;
+    const data=await readFile(file).catch(()=>null);
+    if(!data?.length) return null;
+    try { return {data,contentType:detectImageContentType(data)}; }
+    catch { return null; }
   }
   releases(repo,options) {
     assertValidRepo(repo);

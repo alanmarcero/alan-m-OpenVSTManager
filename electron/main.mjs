@@ -1,4 +1,5 @@
 import {app,BrowserWindow,ipcMain,dialog,shell,session,Menu,protocol,net,screen} from 'electron';
+import {existsSync} from 'node:fs';
 import {mkdir,readFile,stat} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
@@ -9,6 +10,11 @@ import {ManagerService} from '../core/service.mjs';
 import {readJSON,writeJSON} from '../core/storage.mjs';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+function bundledScreenshotsDir(){
+  const source=path.join(root,'public','bundled-screenshots');
+  const built=path.join(root,'dist','bundled-screenshots');
+  return existsSync(source)?source:built;
+}
 const origin='openvst://app';
 app.setName('OpenVST Manager');
 if(process.platform==='win32')app.setAppUserModelId('com.alanmarcero.openvstmanager');
@@ -24,7 +30,7 @@ else {
   session.defaultSession.setPermissionCheckHandler(()=>false);
   const dataDir=app.getPath('userData');
   const bundledCatalog=JSON.parse(await readFile(path.join(root,'catalog.json'),'utf8'));
-  const client=new GitHubClient({cacheDir:path.join(dataDir,'cache'),appVersion:app.getVersion()});
+  const client=new GitHubClient({cacheDir:path.join(dataDir,'cache'),appVersion:app.getVersion(),bundledScreenshotsDir:bundledScreenshotsDir()});
   const manager=new ManagerService({dataDir,
     client,
     installer:new Installer({dataDir,plugins:bundledCatalog}),

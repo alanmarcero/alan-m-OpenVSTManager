@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,mkdir,rm,readFile,access} from 'node:fs/promises';
+import {mkdtemp,mkdir,rm,readFile,access,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {tmpdir} from 'node:os';
 import {ManagerService} from '../core/service.mjs';
@@ -428,4 +428,35 @@ test('saveSettings trims folder paths and re-checks app updates when includePrer
   assert.equal(appChecks, 2);
   assert.equal(s2.appUpdate.available, true);
   assert.equal(s2.appUpdate.latestVersion, '2.0.0-beta.1');
+});
+test('service keeps a screenshot url from the bundled image when GitHub is unreachable', async t => {
+  const dataDir = await mkdtemp(path.join(tmpdir(), 'openvst-service-bundle-'));
+  const shots = await mkdtemp(path.join(tmpdir(), 'openvst-service-shots-'));
+  t.after(() => Promise.all([
+    rm(dataDir, { recursive: true, force: true }),
+    rm(shots, { recursive: true, force: true }),
+  ]));
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x44]);
+  await writeFile(path.join(shots, 'openMaster.png'), png);
+  const { GitHubClient } = await import('../core/github.mjs');
+  const client = new GitHubClient({
+    cacheDir: path.join(dataDir, 'cache'),
+    bundledScreenshotsDir: shots,
+    fetchImpl: async url => {
+      const href = String(url);
+      if (href.endsWith('catalog.json')) return new Response(JSON.stringify([plugin]));
+      if (href.includes('/releases')) return new Response('[]');
+      throw new Error('network down');
+    },
+  });
+  const installer = { paths: { VST3: '/tmp/plugins' }, setPaths() {}, detect: async () => [] };
+  const service = new ManagerService({
+    dataDir, client, installer, platform: 'win32', arch: 'x64',
+    appVersion: '1.4.5', bundledCatalog: [plugin],
+    screenshotBaseUrl: 'openvst://app/screenshots',
+  });
+  const state = await service.getState();
+  assert.match(state.plugins[0].screenshotUrl, /^openvst:\/\/app\/screenshots\/openMaster\.png\?v=[a-f0-9]{12}$/);
+  assert.equal(state.plugins[0].releases.length, 0);
+  assert.equal(state.plugins[0].error, undefined);
 });

@@ -66,6 +66,17 @@ test('catalog supports plugin aliases and validates them', () => {
  assert.throws(() => validateCatalog([{ ...plugin, aliases: 'not-an-array' }]), /aliases/);
  assert.throws(() => validateCatalog([{ ...plugin, aliases: [123] }]), /aliases/);
 });
+test('release notes are the GitHub release body and download names are unchanged', () => {
+ const zip = 'openDucker-Windows-x64.zip';
+ const releases = normalizeReleases([
+  release('v2.7.1', { body: 'Draws the sidechain behind the duck curve.', assets: [asset(zip)] }),
+  release('v2.6.1', { body: null }),
+ ], { platform: 'win32', arch: 'x64', repo: 'openMaster' });
+ assert.equal(releases[0].tag, 'v2.7.1');
+ assert.equal(releases[0].notes, 'Draws the sidechain behind the duck curve.');
+ assert.equal(releases[0].assets[0].name, zip);
+ assert.equal(releases[1].notes, '');
+});
 test('catalog validates screenshotPath and defaults to canonical preview screenshot', () => {
  const plugin = { id: 'openMaster', repo: 'openMaster', name: 'openMaster', description: 'Mastering', category: 'Mastering', bundleNames: { VST3: 'openMaster.vst3' } };
  assert.equal(validateCatalog([plugin])[0].screenshotPath, 'docs/screenshots/preview.png');
