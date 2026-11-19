@@ -4,6 +4,10 @@ Desktop manager for Alan Marcero's audio plugins. Browse releases, install VST3 
 
 [Download for macOS or Windows](https://github.com/alanmarcero/alan-m-OpenVSTManager/releases/latest)
 
+## Beta
+
+OpenVSTManager and the plugins it installs are all in beta. The macOS and Linux plugin builds are not up to date, so the Windows builds are the ones to use for now. A plugin can change dramatically from one release to the next, but the goal is for each one to keep getting better.
+
 ![OpenVST Manager](docs/screenshots/library.png)
 
 - Install VST3 plugins and available Audio Units directly from public GitHub Releases.
