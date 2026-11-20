@@ -21,7 +21,8 @@
     "test:desktop": "npm run build && node scripts/smoke.mjs",
     "test:ui": "playwright test",
     "test:package": "node scripts/package-smoke.mjs",
-    "check:screenshots": "node scripts/check-screenshots.mjs"
+    "check:screenshots": "node scripts/check-screenshots.mjs",
+    "sync:screenshots": "node scripts/sync-screenshots.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.61.0",
