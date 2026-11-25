@@ -89,10 +89,11 @@ test('installs root bundles and Windows VST3 files', async (t) => {
   assert.equal(await readFile(path.join(f.paths.VST3, 'Test.vst3'), 'utf8'), 'binary');
 });
 
-test('rejects checksum mismatch before touching an installed plugin', async (t) => {
+test('rejects checksum mismatch or missing digest before touching an installed plugin', async (t) => {
   const f = await fixture(t);
   await f.installer.install({ plugin, tag: 'v1', formats: ['VST3'], ...await f.archive() });
   await assert.rejects(f.installer.install({ plugin, tag: 'v2', formats: ['VST3'], ...await f.archive('v2'), digest: `sha256:${'0'.repeat(64)}` }), /checksum|digest/i);
+  await assert.rejects(f.installer.install({ plugin, tag: 'v2', formats: ['VST3'], archivePath: (await f.archive('v2')).archivePath, digest: null }), /checksum|digest/i);
   assert.equal(await readFile(path.join(f.paths.VST3, 'Test.vst3/Contents/MacOS/Test'), 'utf8'), 'v1');
 });
 

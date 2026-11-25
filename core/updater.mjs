@@ -130,11 +130,14 @@ export async function downloadAppUpdate({
 }) {
   if (!asset?.url || !asset?.name || !tempDir) throw new Error('Invalid download parameters.');
   assertTrustedUpdateUrl(asset.url);
-  if (checksumAsset?.url) assertTrustedUpdateUrl(checksumAsset.url);
   const safeName = path.basename(asset.name);
   if (!safeName || safeName !== asset.name || safeName === '.' || safeName === '..' || /[\x00-\x1f\\/]/.test(safeName)) {
     throw new Error('Invalid update asset filename.');
   }
+  if (!checksumAsset?.url) {
+    throw new Error('Checksum verification failed: release is missing SHA256SUMS.txt.');
+  }
+  assertTrustedUpdateUrl(checksumAsset.url);
   if (asset.size > maxBytes) {
     throw new Error('Download exceeds size limit.');
   }
@@ -173,46 +176,44 @@ export async function downloadAppUpdate({
   }
   await file.close();
 
-  // Verify sha256 checksum if published
-  if (checksumAsset?.url) {
-    try {
-      const shaResponse = await fetchWithRedirects(checksumAsset.url, { fetchImpl, timeoutMs: 30_000, appVersion });
-      const chunks = [];
-      let shaBytes = 0;
-      for await (const chunk of shaResponse.body) {
-        shaBytes += chunk.length;
-        if (shaBytes > 1024 * 1024) throw new Error('Checksum manifest exceeds size limit.');
-        chunks.push(Buffer.from(chunk));
-      }
-      const shaText = Buffer.concat(chunks).toString('utf8');
-      let expectedHash = null;
-      const nonEmptyLines = shaText.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
-      for (const trimmed of nonEmptyLines) {
-        const match = trimmed.match(/^([a-f0-9]{64})\s+[*]?(.+)$/i);
-        if (match && path.posix.basename(match[2].trim().replace(/\\/g, '/')) === asset.name) {
-          expectedHash = match[1].toLowerCase();
-          break;
-        }
-      }
-      if (!expectedHash && nonEmptyLines.length === 1 && /^[a-f0-9]{64}$/i.test(nonEmptyLines[0])) {
-        expectedHash = nonEmptyLines[0].toLowerCase();
-      }
-      if (!expectedHash) {
-        throw new Error(`Checksum manifest does not include ${asset.name}.`);
-      }
-      const hash = createHash('sha256');
-      for await (const chunk of createReadStream(destination)) {
-        hash.update(chunk);
-      }
-      const actualHash = hash.digest('hex').toLowerCase();
-      if (actualHash !== expectedHash) {
-        throw new Error(`Checksum mismatch for ${asset.name}. Expected ${expectedHash}, got ${actualHash}.`);
-      }
-    } catch (error) {
-      await rm(destination, { force: true }).catch(() => {});
-      if (error.message.includes('Checksum mismatch')) throw error;
-      throw new Error(`Checksum verification failed for ${asset.name}: ${error.message}`, { cause: error });
+  // Verify sha256 checksum (mandatory)
+  try {
+    const shaResponse = await fetchWithRedirects(checksumAsset.url, { fetchImpl, timeoutMs: 30_000, appVersion });
+    const chunks = [];
+    let shaBytes = 0;
+    for await (const chunk of shaResponse.body) {
+      shaBytes += chunk.length;
+      if (shaBytes > 1024 * 1024) throw new Error('Checksum manifest exceeds size limit.');
+      chunks.push(Buffer.from(chunk));
     }
+    const shaText = Buffer.concat(chunks).toString('utf8');
+    let expectedHash = null;
+    const nonEmptyLines = shaText.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+    for (const trimmed of nonEmptyLines) {
+      const match = trimmed.match(/^([a-f0-9]{64})\s+[*]?(.+)$/i);
+      if (match && path.posix.basename(match[2].trim().replace(/\\/g, '/')) === asset.name) {
+        expectedHash = match[1].toLowerCase();
+        break;
+      }
+    }
+    if (!expectedHash && nonEmptyLines.length === 1 && /^[a-f0-9]{64}$/i.test(nonEmptyLines[0])) {
+      expectedHash = nonEmptyLines[0].toLowerCase();
+    }
+    if (!expectedHash) {
+      throw new Error(`Checksum manifest does not include ${asset.name}.`);
+    }
+    const hash = createHash('sha256');
+    for await (const chunk of createReadStream(destination)) {
+      hash.update(chunk);
+    }
+    const actualHash = hash.digest('hex').toLowerCase();
+    if (actualHash !== expectedHash) {
+      throw new Error(`Checksum mismatch for ${asset.name}. Expected ${expectedHash}, got ${actualHash}.`);
+    }
+  } catch (error) {
+    await rm(destination, { force: true }).catch(() => {});
+    if (error.message.includes('Checksum mismatch')) throw error;
+    throw new Error(`Checksum verification failed for ${asset.name}: ${error.message}`, { cause: error });
   }
 
   return destination;

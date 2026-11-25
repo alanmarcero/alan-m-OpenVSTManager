@@ -138,8 +138,9 @@ async function ownsRecord(record) {
 }
 
 async function verifyDigest(filename, digest) {
-  if (digest == null || digest === '') return;
-  if (!/^sha256:[a-f0-9]{64}$/i.test(digest)) throw new Error('Unsupported or invalid archive checksum; expected sha256');
+  if (!digest || typeof digest !== 'string' || !/^sha256:[a-f0-9]{64}$/i.test(digest)) {
+    throw new Error('Archive is missing a valid sha256 checksum; refusing unverified installation');
+  }
   const hash = createHash('sha256');
   for await (const chunk of createReadStream(filename)) hash.update(chunk);
   if (hash.digest('hex') !== digest.slice(7).toLowerCase()) throw new Error('Archive checksum mismatch; download the release again');

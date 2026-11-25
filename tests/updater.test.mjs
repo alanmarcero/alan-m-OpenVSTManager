@@ -283,6 +283,12 @@ test('downloadAppUpdate rejects untrusted checksum URLs before downloading insta
     }), /untrusted/i);
     assert.equal(fetched, false);
     assert.throws(() => applyAppUpdate({ installerPath: 'relative/setup.exe', platform: 'win32' }), /Absolute installer path/);
+
+    await assert.rejects(() => downloadAppUpdate({
+      asset: { name: 'OpenVSTManager.exe', url: 'https://github.com/app.exe', size: 10 },
+      tempDir: dir,
+      fetchImpl: async () => new Response('x'),
+    }), /SHA256SUMS\.txt/);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
