@@ -1,4 +1,4 @@
-import {app,BrowserWindow,ipcMain,dialog,shell,session,Menu,protocol,net,screen} from 'electron';
+import {app,BrowserWindow,ipcMain,dialog,shell,session,Menu,protocol,net,screen,safeStorage} from 'electron';
 import {existsSync} from 'node:fs';
 import {mkdir,readFile,stat} from 'node:fs/promises';
 import path from 'node:path';
@@ -31,11 +31,17 @@ else {
   const dataDir=app.getPath('userData');
   const bundledCatalog=JSON.parse(await readFile(path.join(root,'catalog.json'),'utf8'));
   const client=new GitHubClient({cacheDir:path.join(dataDir,'cache'),appVersion:app.getVersion(),bundledScreenshotsDir:bundledScreenshotsDir()});
+  const tokenCipher={
+    isAvailable:()=>safeStorage.isEncryptionAvailable(),
+    encrypt:plain=>safeStorage.encryptString(plain).toString('base64'),
+    decrypt:cipher=>safeStorage.decryptString(Buffer.from(cipher,'base64')),
+  };
   const manager=new ManagerService({dataDir,
     client,
     installer:new Installer({dataDir,plugins:bundledCatalog}),
     appVersion:app.getVersion(),bundledCatalog,
     screenshotBaseUrl:`${origin}/screenshots`,
+    tokenCipher,
     onProgress:progress=>{if(window&&!window.isDestroyed())window.webContents.send('manager:progress',progress);}
   });
   protocol.handle('openvst',async request=>{

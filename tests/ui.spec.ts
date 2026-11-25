@@ -27,7 +27,7 @@ const initialState: ManagerState = {
     paths: { VST3: '/tmp/openvst-test/VST3', AU: '/tmp/openvst-test/Components' },
     backupFolder: '/tmp/openvst-test/backups',
     preferredFormats: ['VST3', 'AU'],
-    githubToken: '',
+    hasGithubToken: false,
   },
   pathOptions: {
     VST3: [{ label: 'User folder', path: '/tmp/openvst-test/VST3' }, { label: 'System folder', path: '/Library/Audio/Plug-Ins/VST3' }],

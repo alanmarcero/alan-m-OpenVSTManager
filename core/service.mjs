@@ -20,8 +20,9 @@ async function mapWithConcurrency(items, limit, worker) {
 }
 
 export class ManagerService {
-  constructor({dataDir,client,installer,platform=process.platform,arch=process.arch,appVersion,bundledCatalog,screenshotBaseUrl=null,onProgress=()=>{}}) {
-    Object.assign(this,{dataDir,client,installer,platform,arch,appVersion,screenshotBaseUrl,onProgress});
+  #githubToken = '';
+  constructor({dataDir,client,installer,platform=process.platform,arch=process.arch,appVersion,bundledCatalog,screenshotBaseUrl=null,tokenCipher=null,onProgress=()=>{}}) {
+    Object.assign(this,{dataDir,client,installer,platform,arch,appVersion,screenshotBaseUrl,tokenCipher,onProgress});
     this.catalog=validateCatalog(bundledCatalog);this.releases=new Map();this.screenshots=new Map();this.settings=null;this.loaded=false;this.busy=false;
     this.appUpdate=null;
   }
@@ -34,6 +35,30 @@ export class ManagerService {
         .map(entry=>rm(path.join(tempRoot,entry.name),{recursive:true,force:true}))
     );
   }
+  #resolveInitialToken(saved){
+    if(typeof saved.githubTokenEncrypted==='string'&&saved.githubTokenEncrypted.trim()&&this.tokenCipher?.isAvailable?.()){
+      try{return {token:String(this.tokenCipher.decrypt(saved.githubTokenEncrypted)||'').trim(),migratedLegacy:false};}
+      catch{return {token:'',migratedLegacy:false};}
+    }
+    if(typeof saved.githubToken==='string'&&saved.githubToken.trim()){
+      return {token:saved.githubToken.trim(),migratedLegacy:Boolean(this.tokenCipher?.isAvailable?.())};
+    }
+    return {token:'',migratedLegacy:false};
+  }
+  async #persistSettings(settings,token){
+    const diskSettings={
+      includePrereleases:settings.includePrereleases,
+      autoCheckAppUpdates:settings.autoCheckAppUpdates,
+      paths:settings.paths,
+      backupFolder:settings.backupFolder,
+      preferredFormats:settings.preferredFormats,
+    };
+    if(token){
+      if(!this.tokenCipher?.isAvailable?.())throw new Error('Secure credential storage is unavailable on this system.');
+      diskSettings.githubTokenEncrypted=this.tokenCipher.encrypt(token);
+    }
+    await writeJSON(path.join(this.dataDir,'settings.json'),diskSettings);
+  }
   async init(){
     if(this.settings)return;
     if(this.initializing)return this.initializing;
@@ -44,7 +69,8 @@ export class ManagerService {
       const defaultBackup=path.join(this.dataDir,'backups');
       const resolvedBackup=typeof saved.backupFolder==='string'&&saved.backupFolder.trim()?saved.backupFolder.trim():defaultBackup;
       if(this.installer.setBackupFolder) this.installer.setBackupFolder(resolvedBackup);
-      const resolvedToken=typeof saved.githubToken==='string'?saved.githubToken.trim():'';
+      const {token:resolvedToken,migratedLegacy}=this.#resolveInitialToken(saved);
+      this.#githubToken=resolvedToken;
       if(this.client.setToken) this.client.setToken(resolvedToken);
       this.settings={
         includePrereleases:saved.includePrereleases ?? false,
@@ -52,8 +78,11 @@ export class ManagerService {
         paths:{...this.installer.paths},
         backupFolder:resolvedBackup,
         preferredFormats:Array.isArray(saved.preferredFormats) ? saved.preferredFormats : (this.platform==='darwin'?['VST3','AU']:['VST3']),
-        githubToken:resolvedToken,
+        hasGithubToken:Boolean(resolvedToken),
       };
+      if(migratedLegacy){
+        await this.#persistSettings(this.settings,resolvedToken).catch(()=>{});
+      }
       await this.cleanupTempDownloads().catch(()=>{});
     })();
     try{return await this.initializing;}finally{this.initializing=null;}
@@ -202,28 +231,29 @@ export class ManagerService {
     const trimmedPaths=patch.paths?Object.fromEntries(Object.entries(patch.paths).map(([f,p])=>[f,p.trim()])):{};
     const defaultBackup=path.join(this.dataDir,'backups');
     const nextBackupFolder=patch.backupFolder!==undefined?(patch.backupFolder.trim()||defaultBackup):this.settings.backupFolder;
-    const nextToken=patch.githubToken!==undefined?patch.githubToken.trim():this.settings.githubToken;
+    const nextToken=patch.githubToken!==undefined?patch.githubToken.trim():this.#githubToken;
     const next={
       includePrereleases:patch.includePrereleases ?? this.settings.includePrereleases,
       autoCheckAppUpdates:patch.autoCheckAppUpdates ?? this.settings.autoCheckAppUpdates,
       paths:{...this.settings.paths,...trimmedPaths},
       backupFolder:nextBackupFolder,
       preferredFormats:patch.preferredFormats ?? this.settings.preferredFormats,
-      githubToken:nextToken,
+      hasGithubToken:Boolean(nextToken),
     };
     this.installer.setPaths(next.paths);
     if(this.installer.setBackupFolder) this.installer.setBackupFolder(next.backupFolder);
-    if(this.client.setToken) this.client.setToken(next.githubToken);
-    try{await writeJSON(path.join(this.dataDir,'settings.json'),next);}
+    if(this.client.setToken) this.client.setToken(nextToken);
+    try{await this.#persistSettings(next,nextToken);}
     catch(error){
       this.installer.setPaths(this.settings.paths);
       if(this.installer.setBackupFolder) this.installer.setBackupFolder(this.settings.backupFolder);
-      if(this.client.setToken) this.client.setToken(this.settings.githubToken);
+      if(this.client.setToken) this.client.setToken(this.#githubToken);
       throw error;
     }
-    const tokenChanged=next.githubToken!==this.settings.githubToken;
+    const tokenChanged=nextToken!==this.#githubToken;
     const enabledAutoCheck=!this.settings.autoCheckAppUpdates && next.autoCheckAppUpdates;
     const prereleaseChanged=next.includePrereleases!==this.settings.includePrereleases;
+    this.#githubToken=nextToken;
     this.settings=next;
     if(this.loaded && tokenChanged){
       return this.refresh();

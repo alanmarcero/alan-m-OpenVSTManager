@@ -773,7 +773,7 @@ function UpdateModal({
 
 function SettingsPanel({ state, manager, busy, save, onError, onNotice, openExternal, onOpenFolder, onInstallManagerUpdate, operate }: {
   state: ManagerState; manager: ManagerAPI; busy: Busy;
-  save: (settings: Settings) => Promise<boolean>;
+  save: (settings: Partial<Settings>) => Promise<boolean>;
   onError: (message: string) => void;
   onNotice: (notice: Notice) => void;
   openExternal: (url: string) => Promise<void>;
@@ -821,11 +821,12 @@ function SettingsPanel({ state, manager, busy, save, onError, onNotice, openExte
     paths: { ...state.settings.paths },
     backupFolder: state.settings.backupFolder || state.defaultBackupFolder || '',
     preferredFormats: Array.isArray(state.settings.preferredFormats) ? [...state.settings.preferredFormats] : (state.platform === 'darwin' ? ['VST3', 'AU'] : ['VST3']),
-    githubToken: state.settings.githubToken || '',
+    githubToken: '',
   }));
 
   const [choosing, setChoosing] = useState(false);
   const [showToken, setShowToken] = useState(false);
+  const [clearGithubToken, setClearGithubToken] = useState(false);
   const [checkingUpdates, setCheckingUpdates] = useState(false);
   const [showActivity, setShowActivity] = useState(false);
   const [activityLines, setActivityLines] = useState<string[] | null>(null);
@@ -836,14 +837,15 @@ function SettingsPanel({ state, manager, busy, save, onError, onNotice, openExte
     paths: { ...state.settings.paths },
     backupFolder: state.settings.backupFolder || state.defaultBackupFolder || '',
     preferredFormats: Array.isArray(state.settings.preferredFormats) ? [...state.settings.preferredFormats] : (state.platform === 'darwin' ? ['VST3', 'AU'] : ['VST3']),
-    githubToken: state.settings.githubToken || '',
+    githubToken: '',
   });
   const formats: PluginFormat[] = state.platform === 'darwin' ? ['VST3', 'AU'] : ['VST3'];
   const changed =
     draft.includePrereleases !== (state.settings.includePrereleases ?? false) ||
     draft.autoCheckAppUpdates !== (state.settings.autoCheckAppUpdates ?? true) ||
     (draft.backupFolder || '') !== (state.settings.backupFolder || state.defaultBackupFolder || '') ||
-    (draft.githubToken || '') !== (state.settings.githubToken || '') ||
+    Boolean((draft.githubToken || '').trim()) ||
+    clearGithubToken ||
     JSON.stringify(draft.preferredFormats) !== JSON.stringify(state.settings.preferredFormats ?? (state.platform === 'darwin' ? ['VST3', 'AU'] : ['VST3'])) ||
     formats.some(format => (draft.paths[format] || '') !== (state.settings.paths?.[format] || ''));
 
@@ -1182,9 +1184,13 @@ function SettingsPanel({ state, manager, busy, save, onError, onNotice, openExte
             id="github-token-input"
             type={showToken ? 'text' : 'password'}
             aria-label="GitHub Personal Access Token"
-            placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
-            value={draft.githubToken}
-            onChange={event => setDraft(current => ({ ...current, githubToken: event.target.value.trim() }))}
+            placeholder={state.settings.hasGithubToken && !clearGithubToken ? 'Token saved (enter new token to replace)' : 'ghp_xxxxxxxxxxxxxxxxxxxx'}
+            value={draft.githubToken || ''}
+            onChange={event => {
+              const value = event.target.value.trim();
+              setDraft(current => ({ ...current, githubToken: value }));
+              if (value) setClearGithubToken(false);
+            }}
             spellCheck={false}
             autoComplete="off"
             disabled={Boolean(busy)}
@@ -1197,11 +1203,14 @@ function SettingsPanel({ state, manager, busy, save, onError, onNotice, openExte
           >
             {showToken ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
-          {draft.githubToken && (
+          {(draft.githubToken || (state.settings.hasGithubToken && !clearGithubToken)) && (
             <button
               type="button"
               className="button button-secondary button-small"
-              onClick={() => setDraft(current => ({ ...current, githubToken: '' }))}
+              onClick={() => {
+                setDraft(current => ({ ...current, githubToken: '' }));
+                setClearGithubToken(Boolean(state.settings.hasGithubToken));
+              }}
             >
               Clear
             </button>
@@ -1302,7 +1311,10 @@ function SettingsPanel({ state, manager, busy, save, onError, onNotice, openExte
               type="button"
               className="button button-secondary"
               disabled={Boolean(busy) || choosing}
-              onClick={() => setDraft(initialDraft())}
+              onClick={() => {
+                setDraft(initialDraft());
+                setClearGithubToken(false);
+              }}
             >
               Discard
             </button>
@@ -1316,16 +1328,22 @@ function SettingsPanel({ state, manager, busy, save, onError, onNotice, openExte
               formats.some(format => !isAbsolutePath(draft.paths[format] || '')) ||
               (Boolean(draft.backupFolder.trim()) && !isAbsolutePath(draft.backupFolder))
             }
-            onClick={() =>
-              void save({
-                ...draft,
+            onClick={() => {
+              const trimmedToken = (draft.githubToken || '').trim();
+              const payload: Partial<Settings> = {
+                includePrereleases: draft.includePrereleases,
+                autoCheckAppUpdates: draft.autoCheckAppUpdates,
+                preferredFormats: draft.preferredFormats,
                 paths: Object.fromEntries(
                   Object.entries(draft.paths).map(([format, folder]) => [format, (folder || '').trim()])
                 ) as Record<PluginFormat, string>,
                 backupFolder: (draft.backupFolder || '').trim(),
-                githubToken: (draft.githubToken || '').trim(),
-              })
-            }
+                ...(trimmedToken ? { githubToken: trimmedToken } : clearGithubToken ? { githubToken: '' } : {}),
+              };
+              setDraft(current => ({ ...current, githubToken: '' }));
+              setClearGithubToken(false);
+              void save(payload);
+            }}
           >
             {busy?.id === 'settings' ? <LoaderCircle size={15} className="spin" /> : <Check size={15} />}
             Save changes

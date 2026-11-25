@@ -56,7 +56,8 @@ export interface Settings {
   paths: Record<PluginFormat, string>;
   backupFolder: string;
   preferredFormats: PluginFormat[];
-  githubToken: string;
+  hasGithubToken?: boolean;
+  githubToken?: string;
 }
 
 export interface AppUpdateInfo {

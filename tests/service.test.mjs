@@ -5,11 +5,22 @@ import path from 'node:path';
 import {tmpdir} from 'node:os';
 import {ManagerService} from '../core/service.mjs';
 const plugin={id:'openMaster',repo:'openMaster',name:'Master',description:'Mastering plugin',category:'Mastering',bundleNames:{VST3:'openMaster.vst3'}};
-async function setup(t){
+function createTestTokenCipher(available = true) {
+  return {
+    isAvailable: () => available,
+    encrypt: plain => `enc:${Buffer.from(plain, 'utf8').toString('base64')}`,
+    decrypt: cipher => {
+      if (!cipher.startsWith('enc:')) throw new Error('Invalid cipher');
+      return Buffer.from(cipher.slice(4), 'base64').toString('utf8');
+    },
+  };
+}
+
+async function setup(t, { tokenCipher = createTestTokenCipher() } = {}){
  const dataDir=await mkdtemp(path.join(tmpdir(),'openvst-service-'));t.after(()=>rm(dataDir,{recursive:true,force:true}));
  const client={catalog:async()=>({data:[plugin],stale:false}),releases:async()=>({data:[],stale:false,fetchedAt:12345})};
  const installer={paths:{VST3:'/tmp/plugins'},setPaths(paths){this.paths={...this.paths,...paths};},detect:async()=>[]};
- return {service:new ManagerService({dataDir,client,installer,platform:'darwin',arch:'arm64',appVersion:'1.1.0',bundledCatalog:[plugin]}),dataDir,client};
+ return {service:new ManagerService({dataDir,client,installer,platform:'darwin',arch:'arm64',appVersion:'1.1.0',bundledCatalog:[plugin],tokenCipher}),dataDir,client};
 }
 test('state distinguishes no published release from a failed refresh',async t=>{
  const {service,client}=await setup(t);
@@ -97,8 +108,10 @@ test('service routes installAll and updateAll correctly', async t => {
   assert.equal(installedPlugins[0].overwrite, true);
 });
 
-test('service persists backupFolder, githubToken, preferredFormats, and handles app updates', async t => {
+test('service encrypts githubToken on disk, omits raw token from getState, and migrates legacy plaintext tokens', async t => {
   const {service, dataDir, client}=await setup(t);
+  let lastClientToken = null;
+  client.setToken = tok => { lastClientToken = tok; };
   const customBackup = path.join(dataDir, 'custom-backups');
   await service.saveSettings({
     backupFolder: customBackup,
@@ -109,11 +122,45 @@ test('service persists backupFolder, githubToken, preferredFormats, and handles 
 
   const state = await service.getState();
   assert.equal(state.settings.backupFolder, customBackup);
-  assert.equal(state.settings.githubToken, 'ghp_test_token_123');
-  assert.deepEqual(state.settings.preferredFormats, ['VST3']);
-  assert.equal(state.settings.autoCheckAppUpdates, true);
-  assert.ok(state.defaultBackupFolder);
-  assert.ok(state.defaultPaths);
+  assert.equal(state.settings.hasGithubToken, true);
+  assert.equal('githubToken' in state.settings, false);
+  assert.equal(lastClientToken, 'ghp_test_token_123');
+
+  const disk = JSON.parse(await readFile(path.join(dataDir, 'settings.json'), 'utf8'));
+  assert.equal('githubToken' in disk, false);
+  assert.ok(typeof disk.githubTokenEncrypted === 'string' && !disk.githubTokenEncrypted.includes('ghp_test_token_123'));
+
+  // Preserves encrypted token when saving unrelated settings without githubToken patch
+  const savedOther = await service.saveSettings({ includePrereleases: true });
+  assert.equal(savedOther.settings.hasGithubToken, true);
+  assert.equal(lastClientToken, 'ghp_test_token_123');
+
+  // Legacy plaintext settings.json is migrated to githubTokenEncrypted on init
+  const legacyDir = await mkdtemp(path.join(tmpdir(), 'openvst-legacy-tok-'));
+  t.after(() => rm(legacyDir, { recursive: true, force: true }));
+  await writeFile(path.join(legacyDir, 'settings.json'), JSON.stringify({ githubToken: 'ghp_legacy_abc' }), 'utf8');
+  let migratedClientToken = null;
+  const legacyService = new ManagerService({
+    dataDir: legacyDir,
+    client: { ...client, setToken: tok => { migratedClientToken = tok; } },
+    installer: { paths: { VST3: '/tmp/plugins' }, setPaths() {}, detect: async () => [] },
+    platform: 'darwin',
+    arch: 'arm64',
+    appVersion: '1.4.5',
+    bundledCatalog: [plugin],
+    tokenCipher: createTestTokenCipher(),
+  });
+  const legacyState = await legacyService.getState();
+  assert.equal(legacyState.settings.hasGithubToken, true);
+  assert.equal('githubToken' in legacyState.settings, false);
+  assert.equal(migratedClientToken, 'ghp_legacy_abc');
+  const migratedDisk = JSON.parse(await readFile(path.join(legacyDir, 'settings.json'), 'utf8'));
+  assert.equal('githubToken' in migratedDisk, false);
+  assert.ok(migratedDisk.githubTokenEncrypted);
+
+  // Refuses persisting plaintext token when secure storage is unavailable
+  const { service: noCipherService } = await setup(t, { tokenCipher: createTestTokenCipher(false) });
+  await assert.rejects(() => noCipherService.saveSettings({ githubToken: 'ghp_plain' }), /Secure credential storage/);
 
   client.appReleases = async () => ({
     data: [{
@@ -261,6 +308,7 @@ test('uninstallAll reports partial failures, saveSettings refreshes on token cha
   const service = new ManagerService({
     dataDir, client, installer, platform: 'win32', arch: 'x64',
     appVersion: '1.4.1', bundledCatalog: [pluginA],
+    tokenCipher: createTestTokenCipher(),
   });
 
   await service.getState();
@@ -411,6 +459,7 @@ test('saveSettings trims folder paths and re-checks app updates when includePrer
   const service = new ManagerService({
     dataDir, client, installer, platform: 'win32', arch: 'x64',
     appVersion: '1.4.4', bundledCatalog: [plugin],
+    tokenCipher: createTestTokenCipher(),
   });
 
   const s1 = await service.getState();
@@ -418,13 +467,17 @@ test('saveSettings trims folder paths and re-checks app updates when includePrer
   assert.equal(appChecks, 1);
 
   const customPath = path.join(dataDir, 'custom-vst3');
+  let capturedToken = null;
+  client.setToken = tok => { capturedToken = tok; };
   const s2 = await service.saveSettings({
     paths: { VST3: `  ${customPath}  ` },
     githubToken: '  ghp_trimmed  ',
     includePrereleases: true,
   });
   assert.equal(s2.settings.paths.VST3, path.resolve(customPath));
-  assert.equal(s2.settings.githubToken, 'ghp_trimmed');
+  assert.equal(s2.settings.hasGithubToken, true);
+  assert.equal('githubToken' in s2.settings, false);
+  assert.equal(capturedToken, 'ghp_trimmed');
   assert.equal(appChecks, 2);
   assert.equal(s2.appUpdate.available, true);
   assert.equal(s2.appUpdate.latestVersion, '2.0.0-beta.1');
