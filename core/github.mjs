@@ -69,6 +69,17 @@ function formatHttpError(response, { hasToken = false } = {}) {
   return err;
 }
 
+const API_ORIGIN = 'https://api.github.com';
+
+function isGitHubAPIUrl(value) {
+  try {
+    const parsed = new URL(value);
+    return parsed.origin === API_ORIGIN;
+  } catch {
+    return false;
+  }
+}
+
 export class GitHubClient {
   constructor({cacheDir,fetchImpl=fetch,token=null,appVersion='1.4.0',bundledScreenshotsDir=null}={}) {
     this.cacheDir=cacheDir;
@@ -80,9 +91,9 @@ export class GitHubClient {
   setToken(token) {
     this.token = token ? String(token).trim() : null;
   }
-  buildHeaders(accept, etag = null) {
+  buildHeaders(accept, etag = null, url = null) {
     const headers = { Accept: accept, 'User-Agent': `OpenVSTManager/${this.appVersion}` };
-    if (this.token) headers.Authorization = `Bearer ${this.token}`;
+    if (this.token && isGitHubAPIUrl(url)) headers.Authorization = `Bearer ${this.token}`;
     if (etag) headers['If-None-Match'] = etag;
     return headers;
   }
@@ -91,7 +102,7 @@ export class GitHubClient {
     const cached=await readJSON(file,null).catch(()=>null);
     if(cached && !force && Date.now()-cached.fetchedAt<TTL) return {...cached,stale:false};
     try {
-      const headers=this.buildHeaders('application/vnd.github+json',cached?.etag);
+      const headers=this.buildHeaders('application/vnd.github+json',cached?.etag,url);
       const response=await this.fetch(url,{headers,signal:AbortSignal.timeout(20_000),redirect:'error'});
       let data;
       if(response.status===304 && cached) data=cached.data;
@@ -126,7 +137,7 @@ export class GitHubClient {
     }
     try {
       const url=`https://raw.githubusercontent.com/alanmarcero/${repo}/main/${screenshotPath}`;
-      const headers=this.buildHeaders('image/png,image/jpeg,image/webp,image/*',cachedValid?cachedMeta.etag:null);
+      const headers=this.buildHeaders('image/png,image/jpeg,image/webp,image/*',cachedValid?cachedMeta.etag:null,url);
       const response=await this.fetch(url,{headers,signal:AbortSignal.timeout(20_000),redirect:'error'});
       let data,contentType,version;
       if(response.status===304 && cachedValid) {

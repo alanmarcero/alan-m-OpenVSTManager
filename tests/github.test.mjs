@@ -168,3 +168,22 @@ test('Content-Length pre-check rejects oversized responses before reading body a
   const limitedAnon=await setup(t,async()=>new Response('{}',{status:403,headers:{'x-ratelimit-remaining':'0'}}));
   await assert.rejects(()=>limitedAnon.releases('openMaster'),/GitHub Token in Settings/i);
 });
+test('Authorization header is sent only to api.github.com and never to raw.githubusercontent.com',async t=>{
+  const seen=[];
+  const png=Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a,0x00]);
+  const client=await setup(t,async(url,init)=>{
+    seen.push({url,auth:init?.headers?.Authorization || null});
+    if(url.includes('/catalog.json')){
+      return new Response(JSON.stringify([{id:'openMaster',repo:'openMaster',name:'Master',description:'d',category:'Mastering',bundleNames:{VST3:'openMaster.vst3'}}]));
+    }
+    if(url.endsWith('.png')) return new Response(png);
+    return new Response('[]');
+  });
+  client.setToken('ghp_secret_pat');
+  await client.releases('openMaster');
+  await client.catalog();
+  await client.screenshot('openMaster');
+  assert.equal(seen[0].auth,'Bearer ghp_secret_pat');
+  assert.equal(seen[1].auth,null);
+  assert.equal(seen[2].auth,null);
+});

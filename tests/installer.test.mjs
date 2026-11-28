@@ -502,3 +502,21 @@ test('setBackupFolder resets on whitespace and Windows locationMismatch ignores 
     assert.equal(detected[0].locationMismatch, undefined);
   }
 });
+
+test('external backup preserves symlinks verbatim instead of resolving targets', async (t) => {
+  const f = await fixture(t);
+  const backupFolder = path.join(f.root, 'external-backups');
+  const installer = new Installer({ dataDir: f.dataDir, paths: f.paths, backupFolder, platform: 'darwin', home: f.root, plugins: [plugin] });
+  const secretFile = path.join(f.root, 'outside-secret.txt');
+  await writeFile(secretFile, 'top-secret');
+
+  const bundle = path.join(f.paths.VST3, 'Test.vst3');
+  await mkdir(path.join(bundle, 'Contents'), { recursive: true });
+  await symlink(secretFile, path.join(bundle, 'Contents', 'leak.txt'));
+
+  await installer.uninstall({ plugin, formats: ['VST3'], unmanaged: true });
+
+  const backedUpLink = path.join(backupFolder, 'test-plugin-unmanaged', 'Test.vst3', 'Contents', 'leak.txt');
+  const linkInfo = await fs.lstat(backedUpLink);
+  assert.equal(linkInfo.isSymbolicLink(), true);
+});

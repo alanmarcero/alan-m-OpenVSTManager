@@ -19,7 +19,7 @@ const origin='openvst://app';
 app.setName('OpenVST Manager');
 if(process.platform==='win32')app.setAppUserModelId('com.alanmarcero.openvstmanager');
 protocol.registerSchemesAsPrivileged([{scheme:'openvst',privileges:{standard:true,secure:true,supportFetchAPI:true}}]);
-if(process.env.OPENVST_DATA_DIR)app.setPath('userData',path.resolve(process.env.OPENVST_DATA_DIR));
+if(!app.isPackaged && process.env.OPENVST_DATA_DIR)app.setPath('userData',path.resolve(process.env.OPENVST_DATA_DIR));
 if(!app.requestSingleInstanceLock())app.quit();
 else {
   app.disableHardwareAcceleration();

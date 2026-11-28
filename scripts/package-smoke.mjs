@@ -1,16 +1,16 @@
 import {_electron as electron} from '@playwright/test';
 import assert from 'node:assert/strict';
-import {mkdtemp,rm} from 'node:fs/promises';
+import {mkdtemp,realpath,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {readJSON} from '../core/storage.mjs';
 const executablePath=process.platform==='win32'
   ? path.resolve('release/win-unpacked/OpenVST Manager.exe')
   : path.resolve(`release/mac${process.arch==='arm64'?'-arm64':''}/OpenVST Manager.app/Contents/MacOS/OpenVST Manager`);
-const temporary=await mkdtemp(path.join(tmpdir(),'openvst-package-'));
+const temporary=await realpath(await mkdtemp(path.join(tmpdir(),'openvst-package-')));
 let application;
 try{
-  application=await electron.launch({executablePath,env:{...process.env,OPENVST_DATA_DIR:temporary},timeout:60000});
+  application=await electron.launch({executablePath,args:[`--user-data-dir=${temporary}`],env:{...process.env,OPENVST_DATA_DIR:path.join(temporary,'ignored-override')},timeout:60000});
   const page=await application.firstWindow();
   const errors=[];page.on('pageerror',error=>errors.push(error.message));
   await page.getByRole('button',{name:'Settings',exact:true}).waitFor({timeout:90000});

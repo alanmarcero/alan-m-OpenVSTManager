@@ -753,7 +753,7 @@ function UpdateModal({
           </div>
         )}
         <div className="dialog-actions">
-          {update.url && (
+          {update.url && update.autoInstallSupported && (
             <button type="button" className="button button-quiet" disabled={Boolean(isUpdating)} onClick={() => void openExternal(update.url!)} style={{ marginRight: 'auto' }}>
               <ExternalLink size={13} />View release
             </button>
@@ -761,10 +761,16 @@ function UpdateModal({
           <button autoFocus className="button button-secondary" disabled={Boolean(isUpdating)} onClick={onClose}>
             Later
           </button>
-          <button className="button button-primary" disabled={Boolean(isUpdating)} onClick={() => void onInstall()}>
-            {isUpdating ? <LoaderCircle size={14} className="spin" /> : <Download size={14} />}
-            {isUpdating ? 'Updating…' : 'Install and restart'}
-          </button>
+          {update.autoInstallSupported ? (
+            <button className="button button-primary" disabled={Boolean(isUpdating)} onClick={() => void onInstall()}>
+              {isUpdating ? <LoaderCircle size={14} className="spin" /> : <Download size={14} />}
+              {isUpdating ? 'Updating…' : 'Install and restart'}
+            </button>
+          ) : update.url ? (
+            <button className="button button-primary" onClick={() => { void openExternal(update.url!); onClose(); }}>
+              <ExternalLink size={14} />Download release
+            </button>
+          ) : null}
         </div>
       </div>
     </dialog>
@@ -1262,14 +1268,24 @@ function SettingsPanel({ state, manager, busy, save, onError, onNotice, openExte
                   <span>You have version {state.appVersion}.</span>
                 </div>
               </div>
-              <button
-                type="button"
-                className="button button-primary"
-                disabled={Boolean(busy)}
-                onClick={handleInstallUpdate}
-              >
-                <Download size={14} />Update now
-              </button>
+              {state.appUpdate.autoInstallSupported ? (
+                <button
+                  type="button"
+                  className="button button-primary"
+                  disabled={Boolean(busy)}
+                  onClick={handleInstallUpdate}
+                >
+                  <Download size={14} />Update now
+                </button>
+              ) : state.appUpdate.url ? (
+                <button
+                  type="button"
+                  className="button button-primary"
+                  onClick={() => void openExternal(state.appUpdate!.url!)}
+                >
+                  <ExternalLink size={14} />Download release
+                </button>
+              ) : null}
             </div>
           ) : state.appUpdate?.error ? (
             <div className="update-error-note">

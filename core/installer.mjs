@@ -609,7 +609,7 @@ export class Installer {
         const entry = { key: change.key, previous: change.previous || null, next: null, prepared: null, backup: null };
         if (change.source) {
           entry.prepared = path.join(await directory(change.root, '.openvstmanager-'), change.bundleName);
-          await fs.cp(change.source, entry.prepared, { recursive: true, force: false, errorOnExist: true });
+          await fs.cp(change.source, entry.prepared, { recursive: true, force: false, errorOnExist: true, verbatimSymlinks: true });
           entry.next = { pluginId: change.key.slice(0, change.key.lastIndexOf(':')), format: change.format, bundleName: change.bundleName, path: change.target, root: change.root, version: change.version || version, identity: identity(await fs.lstat(entry.prepared, { bigint: true })) };
           next.installs[change.key] = entry.next;
           if (change.oldAliasKey) delete next.installs[change.oldAliasKey];
@@ -645,7 +645,7 @@ export class Installer {
               const safeVer = String(change.previous.version || 'backup').replace(/[^a-zA-Z0-9._-]/g, '_');
               const archiveDir = path.join(this.backupFolder, `${change.previous.pluginId}-${safeVer}`);
               await fs.mkdir(archiveDir, { recursive: true });
-              await fs.cp(change.backup, path.join(archiveDir, change.previous.bundleName), { recursive: true, force: true });
+              await fs.cp(change.backup, path.join(archiveDir, change.previous.bundleName), { recursive: true, force: true, verbatimSymlinks: true });
             } catch { /* Backups to external folder are best-effort */ }
           }
         }

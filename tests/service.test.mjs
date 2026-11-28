@@ -146,7 +146,7 @@ test('service encrypts githubToken on disk, omits raw token from getState, and m
     installer: { paths: { VST3: '/tmp/plugins' }, setPaths() {}, detect: async () => [] },
     platform: 'darwin',
     arch: 'arm64',
-    appVersion: '1.4.6',
+    appVersion: '1.4.7',
     bundledCatalog: [plugin],
     tokenCipher: createTestTokenCipher(),
   });
@@ -505,7 +505,7 @@ test('service keeps a screenshot url from the bundled image when GitHub is unrea
   const installer = { paths: { VST3: '/tmp/plugins' }, setPaths() {}, detect: async () => [] };
   const service = new ManagerService({
     dataDir, client, installer, platform: 'win32', arch: 'x64',
-    appVersion: '1.4.6', bundledCatalog: [plugin],
+    appVersion: '1.4.7', bundledCatalog: [plugin],
     screenshotBaseUrl: 'openvst://app/screenshots',
   });
   const state = await service.getState();

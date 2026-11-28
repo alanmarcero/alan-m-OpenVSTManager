@@ -195,6 +195,7 @@ export class ManagerService {
         const installerPath=await downloadAppUpdate({
           asset:this.appUpdate.asset,
           checksumAsset:this.appUpdate.checksumAsset,
+          signatureAsset:this.appUpdate.signatureAsset,
           tempDir:temporary,
           appVersion:this.appVersion,
           onProgress:percent=>this.progress('manager-update','downloading-update',`Downloading OpenVST Manager v${this.appUpdate.latestVersion}`,percent),

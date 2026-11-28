@@ -69,11 +69,20 @@ export interface AppUpdateInfo {
   publishedAt?: string;
   notes?: string;
   url?: string;
+  autoInstallSupported?: boolean;
   asset?: {
     name: string;
     url: string;
     size: number;
   };
+  checksumAsset?: {
+    name: string;
+    url: string;
+  } | null;
+  signatureAsset?: {
+    name: string;
+    url: string;
+  } | null;
   error?: string;
 }
 

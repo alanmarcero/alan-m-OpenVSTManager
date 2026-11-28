@@ -68,6 +68,13 @@ jobs:
         working-directory: artifacts
         shell: bash
         run: sha256sum * > SHA256SUMS.txt
+      - name: Sign checksums
+        if: env.APP_UPDATE_SIGNING_KEY != ''
+        working-directory: artifacts
+        env:
+          APP_UPDATE_SIGNING_KEY: ${{ secrets.APP_UPDATE_SIGNING_KEY }}
+        run: |
+          node -e "import { sign } from 'node:crypto'; import { readFileSync, writeFileSync } from 'node:fs'; writeFileSync('SHA256SUMS.txt.sig', sign(null, readFileSync('SHA256SUMS.txt'), process.env.APP_UPDATE_SIGNING_KEY));"
       - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           files: artifacts/*

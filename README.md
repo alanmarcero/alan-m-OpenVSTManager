@@ -101,7 +101,7 @@ npm run cli -- paths
 npm run cli -- paths VST3 /absolute/path/to/plugins
 ```
 
-Use `--data-dir /absolute/path` for isolated CLI settings and receipts. The desktop app also accepts the `OPENVST_DATA_DIR` environment variable. Do not run the CLI and desktop app against the same settings directory concurrently.
+Use `--data-dir /absolute/path` for isolated CLI settings and receipts. Unpackaged development builds also accept the `OPENVST_DATA_DIR` environment variable. Do not run the CLI and desktop app against the same settings directory concurrently.
 
 Settings, receipts, cache and a bounded activity log live in Electron's user-data directory: `~/Library/Application Support/OpenVST Manager` on macOS, `%APPDATA%/OpenVST Manager` on Windows, and `$XDG_CONFIG_HOME/OpenVST Manager` (normally `~/.config/OpenVST Manager`) on Linux. Theme choice is stored in the local renderer profile.
 
